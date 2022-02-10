@@ -8,6 +8,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(readr)
+library(stringr)
 
 # (1) Load and organize data ----
 # dat <- read_csv("cnb_merged_20220107.csv")
@@ -16,7 +17,8 @@ dat$remote <- ifelse(dat$platform=="webcnp",0,1)
 names(dat)[6] <- "bblid"
 dat <- dat[,c(1:6,8:20,525,21:524)]
 dat$test_sessions_v.dotest <- as.Date(dat$test_sessions_v.dotest,"%m/%d/%y")
-dat <- dat[dat$bblid>9999,]
+dat <- dat[-which(dat$bblid<10000),]
+names(dat)[c(7,10,13)] <- c("age","dotest","sex")
 
 demo <- dat[,1:20]    # demographics & non-test-specific things
 
