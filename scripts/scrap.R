@@ -9,6 +9,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(readr)
+library(stringr)
 
 # (1) Load and organize data ----
 # dat <- read_csv("cnb_merged_20220107.csv")
@@ -113,7 +114,7 @@ nnn <- c(sum(!is.na(temp$finp)),
          sum(!is.na(temp$frem)),
          sum(!is.na(temp$minp)),
          sum(!is.na(temp$mrem)))
-temp$
+
 
 ggplot(temp,aes(x=test_sessions_v.age)) +
   scale_color_manual(values=colors) +
@@ -134,8 +135,53 @@ ggplot(temp,aes(x=test_sessions_v.age)) +
 
 
 
+# making graphs in a loop
+
+# only need age, sex, remote, and acc/spe
+adt <- cbind(demo, dat[,grepl("adt",colnames(dat))])   # PC and RTCR
+adt <- adt[!is.na(adt$adt_rtcr),]
+adt <- adt[!(adt$adt_valid %in% notval),]
+adt <- select(adt, "age","dotest","sex","remote","adt_pc","adt_rtcr")    # get every test into this format
 
 
+acc_texts <- c("adt","cpf","cpt","cpw","digsym","dsm","er40","gng","lnb","medf",
+               "pcet_cat","pcet_acc2","plot","pmat","pvrt","tap","volt")          # no aim or disc for now, no ddataa
+acc_tests <- mget(acc_texts)
+
+
+for (i in 1:length(acc_texts)) {
+  test <- acc_tests[[1]]
+  cr_pc <- ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct")
+  names(test)[5] <- "acc"
+  test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
+  test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
+  test$minp <- ifelse(test$sex=="M" & test$remote == 0,test$acc,NA)
+  test$mrem <- ifelse(test$sex=="M" & test$remote == 1,test$acc,NA)
+  
+  nnn <- c(sum(!is.na(test$finp)),
+           sum(!is.na(test$frem)),
+           sum(!is.na(test$minp)),
+           sum(!is.na(test$mrem)))
+  
+  ggplot(test,aes(x=age)) +
+    scale_color_manual(values=colors) +
+    geom_point(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),size=.8) +
+    geom_point(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),size=.8) +
+    geom_point(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),size=.8) +
+    geom_point(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),size=.8) +
+    geom_smooth(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),se=F,size=1) +
+    geom_smooth(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),se=F,size=1) +
+    geom_smooth(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),se=F,size=1) +
+    geom_smooth(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),se=F,size=1) +
+    theme_minimal() +
+    theme(legend.title = element_blank()) +
+    labs(x = "Age",
+         y = "Percent Correct",
+         title = paste0(str_to_upper(acc_texts[1]), " Accuracy (as ", cr_pc, ") across age, sex and platform")) +
+    scale_x_continuous(limits = c(5,105))
+  
+  ggsave(paste0("plots/",str_to_upper(acc_texts[1]),"_acc.pdf"))
+}
 
 
 
