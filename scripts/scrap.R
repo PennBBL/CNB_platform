@@ -153,7 +153,8 @@ for (i in 1:length(acc_texts)) {
   test <- acc_tests[[1]]
   cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
                   ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
-                         ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct")))
+                         ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
+                                ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
   names(test)[5] <- "acc"
   test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
   test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
@@ -188,7 +189,8 @@ for (i in 1:length(acc_texts)) {
 
 cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
                 ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
-                       ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct")))
+                       ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
+                              ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
 cr_pc <- ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct")
 
 

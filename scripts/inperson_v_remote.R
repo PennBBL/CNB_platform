@@ -30,74 +30,93 @@ notval <- c("N","F","V3")
 mpraxis <- cbind(demo, dat[,grepl("mpraxis",colnames(dat))]) # RTCR
 mpraxis <- mpraxis[!is.na(mpraxis$mpraxis_rtcr),]
 mpraxis <- mpraxis[!(mpraxis$mpraxis_valid %in% notval),]
+mpraxis <- select(mpraxis, "age","dotest","sex","remote","mpraxis_rtcr")
 
 pcet <- cbind(demo, dat[,grepl("pcet",colnames(dat))])   # acc2, RTCR, and cat
 pcet <- pcet[!is.na(pcet$pcet_rtcr),]
 pcet <- pcet[!(pcet$pcet_valid %in% notval),]
+pcet_cat <- select(pcet, "age","dotest","sex","remote","pcet_cat","pcet_rtcr") 
+pcet_acc2 <- select(pcet, "age","dotest","sex","remote","pcet_acc2","pcet_rtcr") 
 
 cpt <- cbind(demo, dat[,grepl("cpt",colnames(dat))])     # PTP, PFP, TPRT
 cpt <- cpt[!is.na(cpt$cpt_tprt),]
 cpt <- cpt[!(cpt$cpt_valid %in% notval),]
+cpt <- select(cpt, "age","dotest","sex","remote","cpt_ptp","cpt_tprt")  
 
 lnb <- cbind(demo, dat[,grepl("lnb",colnames(dat))])     # MCR and MRTC
 lnb <- lnb[!is.na(lnb$lnb_mrtc),]
 lnb <- lnb[!(lnb$lnb_valid %in% notval),]
+lnb <- select(lnb, "age","dotest","sex","remote","lnb_mcr","lnb_mrtc")
 
 er40 <- cbind(demo, dat[,grepl("er40",colnames(dat))])   # CR and RTCR
 er40 <- er40[!is.na(er40$er40_rtcr),]
 er40 <- er40[!(er40$er40_valid %in% notval),]
+er40 <- select(er40, "age","dotest","sex","remote","er40_cr","er40_rtcr")    
 
 pvrt <- cbind(demo, dat[,grepl("pvrt",colnames(dat))]) # CR, PC, and RTCR
 pvrt <- pvrt[!is.na(pvrt$pvrt_rtcr),]
 pvrt <- pvrt[!(pvrt$pvrt_valid %in% notval),]
+pvrt <- select(pvrt, "age","dotest","sex","remote","pvrt_cr","pvrt_rtcr")
 
 pmat <- cbind(demo, dat[,grepl("pmat",colnames(dat))]) # PC and RTCR
 pmat <- pmat[!is.na(pmat$pmat_rtcr),]
 pmat <- pmat[!(pmat$pmat_valid %in% notval),]
+pmat <- select(pmat, "age","dotest","sex","remote","pmat_pc","pmat_rtcr")
 
 volt <- cbind(demo, dat[,grepl("volt",colnames(dat))]) # CR and RTCR
 volt <- volt[!is.na(volt$volt_rtcr),]
 volt <- volt[!(volt$volt_valid %in% notval),]
+volt <- select(volt, "age","dotest","sex","remote","volt_cr","volt_rtcr")
 
 cpf <- cbind(demo, dat[,grepl("cpf",colnames(dat))])   # CR and RTCR
 cpf <- cpf[!is.na(cpf$cpf_rtcr),]
 cpf <- cpf[!(cpf$cpf_valid %in% notval),]
+cpf <- select(cpf, "age","dotest","sex","remote","cpf_cr","cpf_rtcr")
 
 medf <- cbind(demo, dat[,grepl("medf",colnames(dat))]) # PC and RTCR
 medf <- medf[!is.na(medf$medf_rtcr),]
 medf <- medf[!(medf$medf_valid  %in% notval),]
+medf <- select(medf, "age","dotest","sex","remote","medf_pc","medf_rtcr")
 
 adt <- cbind(demo, dat[,grepl("adt",colnames(dat))])   # PC and RTCR
 adt <- adt[!is.na(adt$adt_rtcr),]
 adt <- adt[!(adt$adt_valid %in% notval),]
+adt <- select(adt, "age","dotest","sex","remote","adt_pc","adt_rtcr")
 
 plot <- cbind(demo, dat[,grepl("plot",colnames(dat))]) # PC and RTCR
 plot <- plot[!is.na(plot$plot_rtcr),]
 plot <- plot[!(plot$plot_valid %in% notval),]
+plot <- select(plot, "age","dotest","sex","remote","plot_pc","plot_rtcr")
 
 cpw <- cbind(demo, dat[,grepl("cpw",colnames(dat))])   # CR and RTCR
 cpw <- cpw[!is.na(cpw$cpw_rtcr),]
 cpw <- cpw[!(cpw$cpw_valid %in% notval),]
+cpw <- select(cpw, "age","dotest","sex","remote","cpw_cr","cpw_rtcr")
 
 tap <- cbind(demo, dat[,grepl("tap",colnames(dat))])   # hand and TOT
 tap <- tap[!is.na(tap$tap_tot),]
 tap <- tap[!(tap$tap_valid %in% notval),]
+# not sure how to look at TAP data
 
 digsym <- cbind(demo, dat[,grepl("digsym",colnames(dat))], dat[,grepl("ds",colnames(dat))])   # cor and corrt
 digsym <- digsym[!is.na(digsym$dscor),-c(24,26)]
 digsym <- digsym[!(digsym$digsym_valid %in% notval),]
+digsym <- select(digsym, "age","dotest","sex","remote","dscor","dscorrt")
 
 dsm <- cbind(demo, dat[,grepl("digsym",colnames(dat))], dat[,grepl("ds",colnames(dat))])   # memcr and mcrrt
 dsm <- dsm[!is.na(dsm$dsmemcr),-c(23,25)]   # memory component of digsym test
 dsm <- dsm[!(dsm$digsym_valid %in% notval),]
+dsm <- select(dsm, "age","dotest","sex","remote","dsmemcr","dsmcrrt")
 
 gng <- cbind(demo, dat[,grepl("gng",colnames(dat))])   # CR and RTCR
 gng <- gng[!is.na(gng$gng_cr),]
 gng <- gng[!(gng$gng_valid %in% notval),]
+gng <- select(gng, "age","dotest","sex","remote","gng_cr","gng_rtcr")
 
 aim <- cbind(demo, dat[,grepl("aim",colnames(dat))])   # TOT and totrt    empty for now
 aim <- aim[!is.na(aim$aim_tot),]
 aim <- aim[!(aim$tap_valid %in% notval),]
+aim <- select(aim, "age","dotest","sex","remote","adt_pc","adt_rtcr") # not sure what to use here
 
 ddisc # all DISC tasks are missing data right now
 
@@ -109,48 +128,92 @@ edisc
 # (2) Plots comparing sex and platform with age on x-axis (noting n's) ----
 
 # * (i) accuracy (adt,cpf,cpt,cpw,er40,lnb,medf,plot,pmat,pvrt,volt) ----
-
-# * * (a) ADT accuracy ----
-temp <- adt %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(adt_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
 colors <- c("#6E4230", "#BF9660", "#065C50", "#48B0A2")
 
-adt_gg1 <- ggplot(new,aes(x=age)) +
+acc_texts <- c("adt","cpf","cpt","cpw","digsym","dsm","er40","gng","lnb","medf",
+               "pcet_cat","pcet_acc2","plot","pmat","pvrt","volt")          # no aim or disc for now, no data, no tap bc not sure what to do, no mpraxis (only rt)
+acc_tests <- mget(acc_texts)
+
+plotlist <- list()
+for (i in 1:length(acc_texts)) {
+  test <- acc_tests[[i]]
+  cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
+                  ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
+                         ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
+                                ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
+  names(test)[5] <- "acc"
+  test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
+  test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
+  test$minp <- ifelse(test$sex=="M" & test$remote == 0,test$acc,NA)
+  test$mrem <- ifelse(test$sex=="M" & test$remote == 1,test$acc,NA)
+  
+  nnn <- c(sum(!is.na(test$finp)),
+           sum(!is.na(test$frem)),
+           sum(!is.na(test$minp)),
+           sum(!is.na(test$mrem)))
+  
+  p <- ggplot(test,aes(x=age)) +
+    scale_color_manual(values=colors) +
+    geom_point(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),size=.8) +
+    geom_point(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),size=.8) +
+    geom_point(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),size=.8) +
+    geom_point(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),size=.8) +
+    geom_smooth(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),se=F,size=1) +
+    geom_smooth(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),se=F,size=1) +
+    geom_smooth(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),se=F,size=1) +
+    geom_smooth(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),se=F,size=1) +
+    theme_minimal() +
+    theme(legend.title = element_blank()) +
+    labs(x = "Age",
+         y = "Percent Correct",
+         title = paste0(str_to_upper(acc_texts[1]), " Accuracy (as ", cr_pc, ") across age, sex and platform")) +
+    scale_x_continuous(limits = c(5,105))
+  
+  plotlist[[i]] <- p
+}
+
+pdf("plots/acc_plots.pdf")
+for (i in 1:length(acc_texts)) {
+  print(plotlist[[i]])
+}
+dev.off()
+
+
+
+
+
+# * * (a) ADT accuracy ----
+test <- adt
+cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
+                ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
+                       ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
+                              ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
+names(test)[5] <- "acc"
+test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
+test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
+test$minp <- ifelse(test$sex=="M" & test$remote == 0,test$acc,NA)
+test$mrem <- ifelse(test$sex=="M" & test$remote == 1,test$acc,NA)
+
+nnn <- c(sum(!is.na(test$finp)),
+         sum(!is.na(test$frem)),
+         sum(!is.na(test$minp)),
+         sum(!is.na(test$mrem)))
+
+ggplot(test,aes(x=age)) +
   scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
+  geom_point(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),size=.8) +
+  geom_point(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),size=.8) +
+  geom_point(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),size=.8) +
+  geom_point(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),size=.8) +
+  geom_smooth(aes(y=finp, color=paste("Female In-person, n =",nnn[1])),se=F,size=1) +
+  geom_smooth(aes(y=frem, color=paste("Female Remote, n =",nnn[2])),se=F,size=1) +
+  geom_smooth(aes(y=minp, color=paste("Male In-person, n =",nnn[3])),se=F,size=1) +
+  geom_smooth(aes(y=mrem, color=paste("Male Remote, n =",nnn[4])),se=F,size=1) +
   theme_minimal() +
   theme(legend.title = element_blank()) +
   labs(x = "Age",
        y = "Percent Correct",
-       title = "ADT Accuracy (as Percent Correct) across age, sex and platform") +
+       title = paste0("ADT Accuracy (as ", cr_pc, ") across age, sex and platform")) +
   scale_x_continuous(limits = c(5,105))
 
 ggsave("plots/ADT_acc.pdf")
@@ -1643,23 +1706,24 @@ ggsave("plots/individual/GNG_spe.pdf")
 # (3) 2019-present: Plots comparing sex and platform with age on x-axis (noting n's) ----
 
 # * (i) getting rid of extra dates ----
-adt_c <- adt[adt$test_sessions_v.dotest > as.Date("2019-12-31"),]    # "c" for COVID cause :P  (>u<)
-aim_c <- aim[aim$test_sessions_v.dotest > as.Date("2019-12-31"),]
-cpf_c <- cpf[cpf$test_sessions_v.dotest > as.Date("2019-12-31"),]
-cpt_c <- cpt[cpt$test_sessions_v.dotest > as.Date("2019-12-31"),]
-cpw_c <- cpw[cpw$test_sessions_v.dotest > as.Date("2019-12-31"),]
-digsym_c <- digsym[digsym$test_sessions_v.dotest > as.Date("2019-12-31"),]
-dsm_c <- dsm[dsm$test_sessions_v.dotest > as.Date("2019-12-31"),]
-er40_c <- er40[er40$test_sessions_v.dotest > as.Date("2019-12-31"),]
-gng_c <- gng[gng$test_sessions_v.dotest > as.Date("2019-12-31"),]
-lnb_c <- lnb[lnb$test_sessions_v.dotest > as.Date("2019-12-31"),]
-medf_c <- medf[medf$test_sessions_v.dotest > as.Date("2019-12-31"),]
-mpraxis_c <- mpraxis[mpraxis$test_sessions_v.dotest > as.Date("2019-12-31"),]
-pcet_c <- pcet[pcet$test_sessions_v.dotest > as.Date("2019-12-31"),]
-plot_c <- plot[plot$test_sessions_v.dotest > as.Date("2019-12-31"),]
-pmat_c <- pmat[pmat$test_sessions_v.dotest > as.Date("2019-12-31"),]
-pvrt_c <- pvrt[pvrt$test_sessions_v.dotest > as.Date("2019-12-31"),]
-volt_c <- volt[volt$test_sessions_v.dotest > as.Date("2019-12-31"),]
+adt_c <- adt[adt$dotest > as.Date("2019-12-31"),]    # "c" for COVID cause :P  (>u<)
+aim_c <- aim[aim$dotest > as.Date("2019-12-31"),]
+cpf_c <- cpf[cpf$dotest > as.Date("2019-12-31"),]
+cpt_c <- cpt[cpt$dotest > as.Date("2019-12-31"),]
+cpw_c <- cpw[cpw$dotest > as.Date("2019-12-31"),]
+digsym_c <- digsym[digsym$dotest > as.Date("2019-12-31"),]
+dsm_c <- dsm[dsm$dotest > as.Date("2019-12-31"),]
+er40_c <- er40[er40$dotest > as.Date("2019-12-31"),]
+gng_c <- gng[gng$dotest > as.Date("2019-12-31"),]
+lnb_c <- lnb[lnb$dotest > as.Date("2019-12-31"),]
+medf_c <- medf[medf$dotest > as.Date("2019-12-31"),]
+mpraxis_c <- mpraxis[mpraxis$dotest > as.Date("2019-12-31"),]
+pcet_cat_c <- pcet_cat[pcet_cat$dotest > as.Date("2019-12-31"),]
+pcet_acc2_c <- pcet_acc2[pcet_acc2$dotest > as.Date("2019-12-31"),]
+plot_c <- plot[plot$dotest > as.Date("2019-12-31"),]
+pmat_c <- pmat[pmat$dotest > as.Date("2019-12-31"),]
+pvrt_c <- pvrt[pvrt$dotest > as.Date("2019-12-31"),]
+volt_c <- volt[volt$dotest > as.Date("2019-12-31"),]
 
 # * (ii) accuracy (adt,cpf,cpt,cpw,er40,lnb,medf,plot,pmat,pvrt,volt) ----
 
