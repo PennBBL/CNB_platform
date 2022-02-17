@@ -195,3 +195,72 @@ cr_pc <- ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct
 
 
 
+
+
+
+
+
+
+
+
+
+
+plotlist <- list()
+nnn <- list()
+for (i in 1:4) {        # still not satisfied about the nnn part
+  test <- acc_tests[[i]]
+  cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
+                  ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
+                         ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
+                                ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
+  names(test)[5] <- "acc"
+  test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
+  test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
+  test$minp <- ifelse(test$sex=="M" & test$remote == 0,test$acc,NA)
+  test$mrem <- ifelse(test$sex=="M" & test$remote == 1,test$acc,NA)
+  
+  nnn[[i]] <- c(sum(!is.na(test$finp)),
+                sum(!is.na(test$frem)),
+                sum(!is.na(test$minp)),
+                sum(!is.na(test$mrem)))
+  
+  p <- ggplot(test,aes(x=age)) +
+    scale_color_manual(values=colors) +
+    geom_point(aes(y=finp, color=paste("Female In-person, n =",nnn[[i]][1])),size=.8) +
+    geom_point(aes(y=frem, color=paste("Female Remote, n =",nnn[[i]][2])),size=.8) +
+    geom_point(aes(y=minp, color=paste("Male In-person, n =",nnn[[i]][3])),size=.8) +
+    geom_point(aes(y=mrem, color=paste("Male Remote, n =",nnn[[i]][4])),size=.8) +
+    geom_smooth(aes(y=finp, color=paste("Female In-person, n =",nnn[[i]][1])),se=F,size=1) +
+    geom_smooth(aes(y=frem, color=paste("Female Remote, n =",nnn[[i]][2])),se=F,size=1) +
+    geom_smooth(aes(y=minp, color=paste("Male In-person, n =",nnn[[i]][3])),se=F,size=1) +
+    geom_smooth(aes(y=mrem, color=paste("Male Remote, n =",nnn[[i]][4])),se=F,size=1) +
+    theme_minimal() +
+    theme(legend.title = element_blank()) +
+    labs(x = "Age",
+         y = "Percent Correct",
+         title = paste0(str_to_upper(acc_texts[i]), " Accuracy (as ", cr_pc, ") across age, sex and platform")) +
+    scale_x_continuous(limits = c(5,105))
+  
+  plotlist[[i]] <- p
+}
+
+pdf("plots/test_acc_plots17Feb22.pdf")
+for (i in 1:4) {
+  print(plotlist[[i]])
+}
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
