@@ -4,3 +4,5 @@
 *.twb
 *.docx
 .DS_Store
+.RData
+.RHistory
