@@ -953,7 +953,7 @@ ggsave("plots/individual/GNG_spe.pdf")
 
 
 
-# (3) 2019-present: Plots comparing sex and platform with age on x-axis (noting n's) ----
+# (3) 2020-present: Plots comparing sex and platform with age on x-axis (noting n's) ----
 
 # * (i) getting rid of extra dates ----
 adt_c <- adt[adt$dotest > as.Date("2019-12-31"),]    # "c" for COVID cause :P  (>u<)

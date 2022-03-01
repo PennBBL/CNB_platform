@@ -1,4 +1,4 @@
-# Aki's copy of Noah's script (using Noah's spaghetti plot script)
+# Aki's copy of Noah's script (using Noah's spaghetti plot script) -- turned out to be cross-sectional analysis plots, not longitudinal
 # Import the necessary functions and data
 
 library(tidyverse)
