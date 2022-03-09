@@ -16,6 +16,7 @@ library(lmerTest)
 library(visreg)
 library(ggh4x)
 library(stats)
+library(MatchIt)
 
 # (1) Load and organize data ----
 # dat <- read_csv("cnb_merged_20220107.csv")
@@ -40,6 +41,8 @@ dat <- dat[-which(dat$bblid > 1000000),]
 # exclude the 103 year old for now
 dat <- dat[-which(dat$age >100),]
 
+
+# ignore for age match ----
 demo <- dat[,1:20]    # demographics & non-test-specific things
 
 dat_bbl <- dat[!is.na(dat$bblid),]         # all cols of rows with BBLIDs
@@ -384,167 +387,6 @@ dev.off()
 
 
 
-# trying age-matching code ----
-#      this ended up taking a long time, might need to figure out different age-matching process
-
-library(ccoptimalmatch)
-
-
-# example code from site
-
-# practice code
-create_subset <- not_processed %>%                             # take not_processed data
-  filter(case_control =="case") %>%                            # select only the "case", so in my case all the "rem"
-  arrange(Practice_Id, Gender, JCG) %>%                        # order by practice_id first, then by gender, and then JCG
-  distinct(Gender, JCG, Practice_Id, .keep_all = TRUE) %>%     # keeps all distinct combinations of gender, jcg and practice_id
-  dplyr::mutate(subset = 1:n()) %>%                            # create new variable, subset that is just 1-n
-  select(Gender, JCG, Practice_Id, subset)                     # only select columns Gender, JCG, practice_id, subset
-
-case_with_subset <- not_processed %>%                               # take not_processed data
-  filter(case_control =="case") %>%                                 # select only the "case"
-  full_join(create_subset, by = c("Gender", "JCG", "Practice_Id"))  # 
-
-
-control_with_subset <- not_processed %>% 
-  filter(case_control =="control") %>%
-  right_join(create_subset, by = c("Gender", "JCG", "Practice_Id"))
-
-not_processed1 <- rbind(case_with_subset,control_with_subset)
-
-bdd_controls <- not_processed1[not_processed1$case_control=="control",]
-bdd_controls$cluster_case <- 0
-bdd_cases <- not_processed1[not_processed1$case_control=="case",]
-bdd_cases$cluster_case <- paste("case",1:nrow(bdd_cases),sep = "_")
-
-not_processed1 <- rbind(bdd_cases,bdd_controls)
-not_processed1$age <- not_processed1$JCG-not_processed1$Birth_Year 
-
-bdd_cases <- not_processed1[not_processed1$case_control=="case",]
-bdd_control <- not_processed1[not_processed1$case_control=="control",]
-
-bdd_temp <- data.frame()
-list_p <- unique(bdd_cases$cluster_case)
-
-for(i in 1:length(list_p)){
-  temp <- bdd_cases[bdd_cases$cluster_case==list_p[i],]
-  subset_identified <- temp$subset
-  temp0 <- bdd_control[bdd_control$subset==temp$subset,]
-  temp_final <- rbind(temp,temp0)
-  temp_final$cluster_case <- list_p[i]
-  temp_final=temp_final %>%
-    group_by(cluster_case) %>%
-    mutate(age_diff = abs(age - age[case_control=="case"]),
-           fup_diff = foll_up - foll_up[case_control=="case"])
-  temp_final$age_fup <- ifelse(temp_final$age_diff<=2&temp_final$fup_diff==0,"accept","delete")
-  temp_final <- temp_final[temp_final$age_fup=="accept",]
-  temp_final$age_fup <- NULL
-  bdd_temp <- rbind(bdd_temp,temp_final)
-}
-
-
-bdd_temp = bdd_temp %>% group_by(cluster_case) %>% mutate(total_control_per_case = n()-1)
-bdd_temp$case_ind <- ifelse(bdd_temp$case_control=="case",1,0)
-bdd_temp <- subset(bdd_temp, select=c(cluster_case, Patient_Id, case_control, case_ind,
-                                      JCG, entry_year, CI, age_diff, fup_diff, total_control_per_case))
-
-bdd_temp = bdd_temp %>% group_by(Patient_Id) %>% mutate(freq_of_controls = n())
-
-
-bdd_temp<-bdd_temp[order(bdd_temp$cluster_case,bdd_temp$case_control,bdd_temp$fup_diff,
-                         bdd_temp$age_diff,bdd_temp$freq_of_controls),]
-
-final_data <- optimal_matching(bdd_temp, n_con=4, cluster_case, Patient_Id, 
-                               total_control_per_case, case_control, with_replacement = FALSE)
-
-final_data = final_data %>% group_by(cluster_case) %>% mutate(total_control_matched = n()-1)
-table(final_data$case_control,final_data$total_control_matched)
-
-
-
-# trying example code with my data
-
-my_data <- dat_bbl[,c(6,10,9,8,13,20)]
-my_data <- my_data[!is.na(my_data$test_sessions_v.dob),]
-
-# test specific -- trying it out with adt (since it would have to vary by test anyways)
-my_adt <- cbind(demo, dat[,grepl("adt",colnames(dat))])   # PC and RTCR
-my_adt <- my_adt[!is.na(my_adt$adt_rtcr),]
-my_adt <- my_adt[!(my_adt$adt_valid %in% notval) & !is.na(my_adt$age),]
-my_adt <- select(my_adt, "bblid","dotest","dob","age","test_sessions_v.battery","sex","remote","adt_pc","adt_rtcr")
-
-
-my_create_subset <- my_adt %>%                             
-  filter(remote == 1) %>%                            
-  arrange(sex, age) %>%                        
-  distinct(sex, age, .keep_all = TRUE) %>%     
-  dplyr::mutate(subset = 1:n()) %>%                           
-  select(sex, age, subset)
-
-my_case_with_subset <- my_adt %>%                               
-  filter(remote == 1) %>%                                 
-  full_join(my_create_subset, by = c("sex", "age"))  
-
-my_control_with_subset <- my_adt %>% 
-  filter(remote == 0) %>%
-  right_join(my_create_subset, by = c("sex", "age"))
-
-my_not_processed <- rbind(my_case_with_subset,my_control_with_subset)
-
-my_controls <- my_not_processed[my_not_processed$remote == 0,]
-my_controls$cluster_case <- 0
-my_cases <- my_not_processed[my_not_processed$remote == 1,]
-my_cases <- my_cases[rowSums(is.na(my_cases))<ncol(my_cases),]
-my_cases$cluster_case <- paste("case",1:nrow(my_cases),sep = "_")
-
-my_not_processed <- rbind(my_cases,my_controls)
-
-my_cases <- my_not_processed[my_not_processed$remote == 1,]
-my_cases <- my_cases[rowSums(is.na(my_cases))<ncol(my_cases),]
-my_control <- my_not_processed[my_not_processed$remote == 0,]
-
-my_temp <- data.frame()
-list_p <- unique(my_cases$cluster_case)
-
-for(i in 1:length(list_p)){
-  temp <- my_cases[my_cases$cluster_case==list_p[i],]
-  subset_identified <- temp$subset
-  temp0 <- my_control[my_control$subset==temp$subset,]
-  temp0 <- temp0[rowSums(is.na(temp0))<ncol(temp0),]
-  temp_final <- rbind(temp,temp0)
-  temp_final$cluster_case <- list_p[i]
-  temp_final=temp_final %>%
-    group_by(cluster_case) %>%
-    mutate(age_diff = abs(age - age[remote==1]))
-  temp_final$age_fup <- ifelse(temp_final$age_diff==0,"accept","delete")   # age difference of 0
-  temp_final <- temp_final[temp_final$age_fup=="accept",]
-  temp_final$age_fup <- NULL
-  my_temp <- rbind(my_temp,temp_final)
-}
-
-my_temp = my_temp %>% group_by(cluster_case) %>% mutate(total_control_per_case = n()-1)
-my_temp <- subset(my_temp, select=c(cluster_case, bblid, test_sessions_v.battery, remote, dob, age, 
-                                    dotest, sex, adt_pc,adt_rtcr,age_diff,total_control_per_case))
-
-my_temp = my_temp %>% group_by(bblid) %>% mutate(freq_of_controls = n())
-
-my_temp <- my_temp[order(my_temp$cluster_case,my_temp$remote,
-                         my_temp$age_diff,my_temp$freq_of_controls),]
-my_temp$case_control <- ifelse(my_temp$remote==1,"case","control")
-
-my_final_data <- optimal_matching(my_temp, n_con=1, cluster_case, bblid, 
-                               total_control_per_case, case_control, with_replacement = FALSE) # tried this but it takes way too long (let it run for about an hour already)
-
-
-
-
-
-
-
-
-final_data = final_data %>% group_by(cluster_case) %>% mutate(total_control_matched = n()-1)
-table(final_data$case_control,final_data$total_control_matched)
-
-
 
 
 # for cross-sectional analysis: look at most recent tp for rem and inp for each unique bblid
@@ -561,7 +403,7 @@ table(final_data$case_control,final_data$total_control_matched)
 
 
 dat2 <- dat %>% 
-  select(bblid,test_sessions.datasetid,test_sessions.siteid, 
+  dplyr::select(bblid,test_sessions.datasetid,test_sessions.siteid, 
          test_sessions.famid, test_sessions.subid, age, test_sessions_v.battery, 
          dob, dotest, test_sessions_v.education, test_sessions_v.feducation,
          sex, test_sessions_v.handedness, test_sessions_v.meducation, platform, remote,
@@ -585,6 +427,8 @@ dat2 <- dat %>%
   mutate(sex = ifelse(sex == "F","Female","Male")) %>% 
   mutate(remote = ifelse(platform == "webcnp","In-person","Remote")) %>% 
   mutate(sex_remote = paste(sex,remote))
+
+colnames(dat2)[grep("digsym",colnames(dat2))] <- "ds_valid"
 
 repeats_list <- dat2 %>% 
   group_by(bblid) %>% 
@@ -619,7 +463,7 @@ cnb_cross <- dat2 %>%    # combining all info from bblid's that only have one ro
 # get rid of outliers
 
 tests <- cnb_cross %>%   # bblid, age, dob, dotest, sex, _valid
-  select(!(matches("bblid") | matches("^test") | "age" | "dob" | "dotest" | "sex" | "platform" | "remote" | matches("_valid$") | matches("^aim") | "sex_remote")) %>%    # ^[this]: anything beginning with [this]; [this]$: anything ending with [this]
+  dplyr::select(!(matches("bblid") | matches("^test") | "age" | "dob" | "dotest" | "sex" | "platform" | "remote" | matches("_valid$") | matches("^aim") | "sex_remote")) %>%    # ^[this]: anything beginning with [this]; [this]$: anything ending with [this]
   colnames()
 for(test in tests){
   cnb_cross[[test]] <- ifelse(cnb_cross[[test]] > mean(cnb_cross[[test]],na.rm = TRUE) + 6*sd(cnb_cross[[test]],na.rm = TRUE),mean(cnb_cross[[test]],na.rm = TRUE) + 6*sd(cnb_cross[[test]],na.rm = TRUE),cnb_cross[[test]])
@@ -627,8 +471,8 @@ for(test in tests){
 }
 
 response_vars <- cnb_cross %>% 
-  select(!(contains("valid"))) %>% 
-  select(adt_pc:volt_w_rtcr) %>% 
+  dplyr::select(!(contains("valid"))) %>% 
+  dplyr::select(adt_pc:volt_w_rtcr) %>% 
   colnames()
 
 # exclude aim for now (DISC tasks excluded already)
@@ -646,51 +490,52 @@ Metric_map <- data.frame("Suffix" = c("_cr","_rtcr","_tot","_acc2","_tprt","_ptp
                                      "Correct Responses (%)","Median Response Time \n Correct Responses (ms)","Categories Achieved","Median Response Time \n Correct Responses (ms)",
                                      "True Positive Responses","Correct Responses","Median Response Time \n Correct Responses (ms)"))
 
-LongitudinalPlots <- list()
-cntr <- 1
-theme_set(theme_minimal())
-for(test in response_vars){
-  test_split <- str_split(test,pattern = "_")[[1]]
-  test_prefix <- test_split[1]
-  test_suffix <- paste0("_",test_split[length(test_split)])
-  
-  Plot_title <- Test_map %>% 
-    filter(Prefix == test_prefix) %>% 
-    pull(Test_name)
-  
-  ylabel <- Metric_map %>% 
-    filter(Suffix == test_suffix) %>% 
-    pull(Label)
-  
-  N.df <- cnb_cross[,c(test,"sex_remote","age")] %>% 
-    filter(if_all(everything(), ~ !is.na(.))) %>% 
-    group_by(sex_remote) %>% 
-    dplyr::summarize(n = n()) %>% 
-    mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
-    arrange(sex_remote_N)
-  
-  if(nrow(N.df) == 2){
-    LongitudinalPlots[[cntr]] <- cnb_cross %>% 
-      left_join(N.df) %>% 
-      filter(!is.na(sex_remote_N)) %>% 
-      ggplot(aes_string(x = "age",y = test,color = "sex_remote_N")) + 
-      geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") + 
-      scale_color_manual(values = c("#ca0020","#0571b0")) + theme(legend.position = "bottom")
-    cntr <- cntr + 1
-  } else{
-    LongitudinalPlots[[cntr]] <- cnb_cross %>% 
-      left_join(N.df) %>% 
-      filter(!is.na(sex_remote_N)) %>% 
-      ggplot(aes_string(x = "age",y = test,color = "sex_remote_N")) + 
-      geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") + 
-      scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de")) + theme(legend.position = "bottom")
-    cntr <- cntr + 1
-  }
-}
+# (Noah's) old plot making script ----
+# LongitudinalPlots <- list()
+# cntr <- 1
+# theme_set(theme_minimal())
+# for(test in response_vars){
+#   test_split <- str_split(test,pattern = "_")[[1]]
+#   test_prefix <- test_split[1]
+#   test_suffix <- paste0("_",test_split[length(test_split)])
+#   
+#   Plot_title <- Test_map %>% 
+#     filter(Prefix == test_prefix) %>% 
+#     pull(Test_name)
+#   
+#   ylabel <- Metric_map %>% 
+#     filter(Suffix == test_suffix) %>% 
+#     pull(Label)
+#   
+#   N.df <- cnb_cross[,c(test,"sex_remote","age")] %>% 
+#     filter(if_all(everything(), ~ !is.na(.))) %>% 
+#     group_by(sex_remote) %>% 
+#     dplyr::summarize(n = n()) %>% 
+#     mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
+#     arrange(sex_remote_N)
+#   
+#   if(nrow(N.df) == 2){
+#     LongitudinalPlots[[cntr]] <- cnb_cross %>% 
+#       left_join(N.df) %>% 
+#       filter(!is.na(sex_remote_N)) %>% 
+#       ggplot(aes_string(x = "age",y = test,color = "sex_remote_N")) + 
+#       geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") + 
+#       scale_color_manual(values = c("#ca0020","#0571b0")) + theme(legend.position = "bottom")
+#     cntr <- cntr + 1
+#   } else{
+#     LongitudinalPlots[[cntr]] <- cnb_cross %>% 
+#       left_join(N.df) %>% 
+#       filter(!is.na(sex_remote_N)) %>% 
+#       ggplot(aes_string(x = "age",y = test,color = "sex_remote_N")) + 
+#       geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") + 
+#       scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de")) + theme(legend.position = "bottom")
+#     cntr <- cntr + 1
+#   }
+# }
 
 # use this to make all graphs
 
-
+# * my version of Noah's plot making code ----
 LPall_rec <- list()                                         # [L]ongitudinal [P]lots for [all] and [rec]ent dates
 cntr <- 1
 for(test in response_vars){
@@ -907,6 +752,78 @@ for(test in response_cols){
   
   cntr <- cntr + 1
 }
+
+
+
+
+
+
+
+# age-matching code from Tyler ----
+# i have to do some age-matching per test
+
+demos <- cnb_cross %>% 
+  dplyr::select(bblid:remote)
+
+test_names <- sort(unique(sapply(str_split(response_vars,pattern = "_"),"[[",1)))
+
+for (test in test_names) {
+  templist <- c()
+  
+  test_dat <- cbind(demos, cnb_cross[,grepl(test, colnames(cnb_cross))])
+  last_col <- tail(colnames(test_dat),1)
+  test_dat <- test_dat %>%
+    drop_na(last_col) %>% 
+    drop_na(age)
+  
+  test_rem <- test_dat %>% 
+    filter(remote == "Remote") %>% 
+    mutate(rem = 1)
+  
+  test_inp <- test_dat %>% 
+    filter(remote == "In-person") %>% 
+    mutate(rem = 0)
+  
+  test_dat2 <- rbind(test_rem,test_inp)       # test_dat recombined after adding var, rem = c(0,1)
+  
+  set.seed(2)
+  mod <- matchit(rem~age+sex,data=test_dat2,ratio=1)    # matching by age and sex for now
+  test_inperson <- test_dat2[mod$match.matrix,]
+  
+  test_dat <- rbind(test_rem,test_inperson)
+  
+  templist <- c(templist,"test_dat")
+  
+  if (test %in% c("tap","mpraxis")) {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+  }  else if (test == "pcet") {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    t_test3 <- t.test(test_dat[,20]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+  } else if (test == "ds") {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    t_test3 <- t.test(test_dat[,20]~rem,data=test_dat)
+    t_test4 <- t.test(test_dat[,21]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+    templist <- c(templist,"t_test4")
+  } else {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+  }
+  
+  templist <- mget(templist)
+  assign(paste(test,"list",sep="_"),templist)
+}
+
 
 
 
