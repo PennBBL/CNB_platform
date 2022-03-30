@@ -9,18 +9,42 @@ library(dplyr)
 library(tidyr)
 library(readr)
 library(stringr)
+library(ccoptimalmatch)
+library(tidyverse)
+library(ggdist)
+library(lme4)
+library(ggpubr)
+library(lmerTest)
+library(visreg)
+library(ggh4x)
+library(stats)
+library(MatchIt)
+
+
 
 # (1) Load and organize data ----
 # dat <- read_csv("cnb_merged_20220107.csv")
-dat <- read_csv("data/cnb_merged_20220201.csv")    # digsym, GNG, AIM, + itemwise (iw) DDISC, iw RDISC, iw EDISC
+x <- read_csv("data/cnb_merged_20220201.csv")    # digsym, GNG, AIM, + itemwise (iw) DDISC, iw RDISC, iw EDISC
+dat <- x
 dat$remote <- ifelse(dat$platform=="webcnp",0,1)
-names(dat)[6] <- "bblid"
 dat <- dat[,c(1:6,8:20,525,21:524)]
 dat$test_sessions_v.dotest <- as.Date(dat$test_sessions_v.dotest,"%m/%d/%y")
-dat <- dat[-which(dat$bblid<10000),]
-names(dat)[c(7,10,13)] <- c("age","dotest","sex")
+dat$test_sessions_v.dob <- as.Date(dat$test_sessions_v.dob,"%m/%d/%y")
+dat$test_sessions_v.dob <- as.Date(ifelse(dat$test_sessions_v.dob > Sys.Date(), 
+                                          format(dat$test_sessions_v.dob, "19%y-%m-%d"), 
+                                          format(dat$test_sessions_v.dob)))
+names(dat)[c(6,7,9,10,13)] <- c("bblid","age","dob","dotest","sex")
+ds_names <- names(dat[,grepl("ds",colnames(dat))]) 
+ds_names <- sub("ds","ds_",ds_names)
+colnames(dat)[grep("ds",colnames(dat))] <- ds_names
 
-demo <- dat[,1:20]    # demographics & non-test-specific things
+# get rid of BBLIDs < 5 digits
+dat <- dat[-which(dat$bblid < 10000),]
+dat <- dat[-which(dat$bblid > 1000000),]
+
+# exclude the 103 year old for now
+dat <- dat[-which(dat$age >100),]
+
 
 
 

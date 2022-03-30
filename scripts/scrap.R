@@ -54,6 +54,7 @@ dat_t1 <- dat_bbl[]   # from dat_bbl, get the most recent timepoint data for eac
 
 # * separating out into tasks ----
 notval <- c("N")
+colors <- c("#6E4230", "#BF9660", "#065C50", "#48B0A2")
 
 mpraxis <- cbind(demo, dat[,grepl("mpraxis",colnames(dat))]) # RTCR
 mpraxis <- mpraxis[!is.na(mpraxis$mpraxis_rtcr),]
@@ -162,7 +163,7 @@ test_index[,1] <- sort(c("adt","aim","cpf","cpt","cpw","digsym","dsm","er40","gn
 
 names(test_index) <- c("test_names","acc","speed","weird_acc")
 
-colors <- c("#6E4230", "#BF9660", "#065C50", "#48B0A2")
+
 
 
 
@@ -478,14 +479,14 @@ response_vars <- cnb_cross %>%
 # exclude aim for now (DISC tasks excluded already)
 response_vars <- setdiff(response_vars,c("aim_tot", "aim_totrt"))
 
-Test_map <- data.frame('Prefix' = c("er40","pvrt","volt","cpf","cpw","gng","mpraxis","pcet","pmat","medf","adt","plot","tap","cpt","tap","lnb","volt","plot","ds"),
+Test_map <- data.frame('Prefix' = c("er40","pvrt","volt","cpf","cpw","gng","mpraxis","pcet","pmat","medf","adt","plot","tap","cpt","lnb","volt","plot","ds"),
                        "Test_name" = c("Penn Emotion Recognition Test","Penn Verbal Reasoning Test","Visual Object Learning Test","Penn Face Memory Test",'Penn Word Memory Test',
                                        "Go-No-Go Test","Motor Praxis Test","Penn Conditional Exclusion Test","Penn Matrix Analysis Test","Measured Emotion Differentiation Test",
                                        "Age Differentiation Test","Penn Line Orientation Test","Penn Computerized Finger Tapping Test","Penn Continuous Performance Test",
-                                       "Penn Computerized Finger Tapping Test","Letter-N-Back","Visual Object Learning Test","Penn Line Orientation Test","Digit Symbol Search"))
+                                       "Letter-N-Back","Visual Object Learning Test","Penn Line Orientation Test","Digit Symbol Search"))
 
-Metric_map <- data.frame("Suffix" = c("_cr","_rtcr","_tot","_acc2","_tprt","_ptp","_mcr","_mrtc","_pc","_mp2rtcr","_cat","_mrtc","_tp","_memcr","_mcrrt"),
-                         "Label" = c("Correct Responses","Median Response Time \n Correct Responses (ms)","Average Taps \n (Dominant and Non-dominant hand added together)",
+Metric_map <- data.frame("Suffix" = c("_cor","_cr","_corrt","_rtcr","_tot","_acc2","_tprt","_ptp","_mcr","_mrtc","_pc","_mp2rtcr","_cat","_mrtc","_tp","_memcr","_mcrrt"),
+                         "Label" = c("Correct Responses","Correct Responses","Median Response Time \n Correct Responses (ms)","Median Response Time \n Correct Responses (ms)","Average Taps \n (Dominant and Non-dominant hand added together)",
                                      "Accuracy","Median Response Time \n True Positives (ms)","True Positive (%)","Total True Positive Responses","Median Response Time \n Correct Responses",
                                      "Correct Responses (%)","Median Response Time \n Correct Responses (ms)","Categories Achieved","Median Response Time \n Correct Responses (ms)",
                                      "True Positive Responses","Correct Responses","Median Response Time \n Correct Responses (ms)"))
@@ -779,6 +780,7 @@ for (test in test_names) {
   test_rem <- test_dat %>% 
     filter(remote == "Remote") %>% 
     mutate(rem = 1)
+  n_rem <- dim(test_rem)[1]
   
   test_inp <- test_dat %>% 
     filter(remote == "In-person") %>% 
@@ -789,10 +791,11 @@ for (test in test_names) {
   set.seed(2)
   mod <- matchit(rem~age+sex,data=test_dat2,ratio=1)    # matching by age and sex for now
   test_inperson <- test_dat2[mod$match.matrix,]
+  n_inp <- dim(test_inperson)[1]
   
   test_dat <- rbind(test_rem,test_inperson)
   
-  templist <- c(templist,"test_dat")
+  templist <- c(templist,"n_rem","n_inp","test_dat")
   
   if (test %in% c("tap","mpraxis")) {
     t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
@@ -827,11 +830,461 @@ for (test in test_names) {
 
 
 
+# using the same code from above but incorporating sex and education regression before age-matching ----
+
+# new column for avg parent edu.
+cnb_cross$ParentEdu <- rowMeans(cnb_cross[,c("test_sessions_v.feducation","test_sessions_v.meducation")],na.rm=T)
+cnb_cross <- cnb_cross[,c(1:16,70,17:69)]
+cnb_cross$ParentEdu[is.nan(cnb_cross$ParentEdu)] <- NA   # not sure about using this because there are a lot of obs that have ParentEdu as 0
+
+for (test in test_names) {
+  templist <- c()
+  
+  test_dat <- cbind(demos, cnb_cross[,grepl(test, colnames(cnb_cross))]) %>% 
+    dplyr::select(!matches("valid"))
+  last_col <- tail(colnames(test_dat),1)
+  test_dat <- test_dat %>%
+    drop_na(last_col) %>% 
+    drop_na(age)
+  if (test=="plot"){
+    test_dat <- test_dat %>%
+      drop_na(colnames(test_dat)[ncol(test_dat)-1])
+  }
+  
+  # regressing age out (and possibly avg parent edu as well?) - not yet 3/10/22
+  if (test %in% c("tap","mpraxis")) {
+    test_dat$measure_speed <- names(test_dat)[ncol(test_dat)]
+    
+    names(test_dat)[ncol(test_dat)-1] <- "speed"
+    
+    spe_fit <- glm(speed ~ sex, data = test_dat)
+    test_dat$spe_res <- scale(resid(spe_fit))
+    
+  }  else if (test == "pcet") {
+    test_dat$measure_cat <- names(test_dat)[ncol(test_dat)-2]
+    test_dat$measure_acc2 <- names(test_dat)[ncol(test_dat)-2]
+    test_dat$measure_speed <- names(test_dat)[ncol(test_dat)-2]
+    
+    names(test_dat)[ncol(test_dat)-5] <- "cat"
+    names(test_dat)[ncol(test_dat)-4] <- "acc2"
+    names(test_dat)[ncol(test_dat)-3] <- "speed"
+    
+    cat_fit <- glm(cat ~ sex, data = test_dat)
+    test_dat$cat_res <- scale(resid(cat_fit))
+    
+    acc2_fit <- glm(acc2 ~ sex, data = test_dat)
+    test_dat$acc2_res <- scale(resid(acc2_fit))
+    
+    spe_fit <- glm(speed ~ sex, data = test_dat)
+    test_dat$spe_res <- scale(resid(spe_fit))
+    
+  } else if (test == "ds") {
+    test_dat$measure_acc <- names(test_dat)[ncol(test_dat)-3]
+    test_dat$measure_speed <- names(test_dat)[ncol(test_dat)-3]
+    test_dat$measure_mem_acc <- names(test_dat)[ncol(test_dat)-3]
+    test_dat$measure_mem_speed <- names(test_dat)[ncol(test_dat)-3]
+    
+    names(test_dat)[ncol(test_dat)-7] <- "acc"
+    names(test_dat)[ncol(test_dat)-6] <- "speed"
+    names(test_dat)[ncol(test_dat)-5] <- "mem_acc"
+    names(test_dat)[ncol(test_dat)-4] <- "mem_speed"
+    
+    acc_fit <- glm(acc ~ sex, data = test_dat)
+    test_dat$acc_res <- scale(resid(acc_fit))
+    
+    spe_fit <- glm(speed ~ sex, data = test_dat)
+    test_dat$spe_res <- scale(resid(spe_fit))
+    
+    macc_fit <- glm(mem_acc ~ sex, data = test_dat)
+    test_dat$macc_res <- scale(resid(macc_fit))
+    
+    mspe_fit <- glm(mem_speed ~ sex, data = test_dat)
+    test_dat$mspe_res <- scale(resid(mspe_fit))
+    
+  } else {
+    test_dat$measure_acc <- names(test_dat)[ncol(test_dat)-1]
+    test_dat$measure_speed <- names(test_dat)[ncol(test_dat)-1]
+    
+    names(test_dat)[ncol(test_dat)-3] <- "acc"
+    names(test_dat)[ncol(test_dat)-2] <- "speed"
+    
+    acc_fit <- glm(acc ~ sex, data = test_dat)
+    test_dat$acc_res <- scale(resid(acc_fit))
+    
+    spe_fit <- glm(speed ~ sex, data = test_dat)
+    test_dat$spe_res <- scale(resid(spe_fit))
+  }
+  
+  test_rem <- test_dat %>% 
+    filter(remote == "Remote") %>% 
+    mutate(rem = 1)
+  n_rem <- dim(test_rem)[1]
+  
+  test_inp <- test_dat %>% 
+    filter(remote == "In-person") %>% 
+    mutate(rem = 0)
+  
+  test_dat2 <- rbind(test_rem,test_inp)       # test_dat recombined after adding var, rem = c(0,1)
+  
+  set.seed(2)
+  mod <- matchit(rem~age,data=test_dat2,ratio=1)    # matching by age
+  test_inperson <- test_dat2[mod$match.matrix,]
+  n_inp <- dim(test_inperson)[1]
+  
+  test_dat <- rbind(test_rem,test_inperson)
+  
+  templist <- c(templist,"n_rem","n_inp","test_dat")
+  
+  if (test %in% c("tap","mpraxis")) {
+    t_test1 <- t.test(spe_res~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+  }  else if (test == "pcet") {
+    t_test1 <- t.test(cat_res~rem,data=test_dat)
+    t_test1 <- t.test(acc2_res~rem,data=test_dat)
+    t_test2 <- t.test(spe_res~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+  } else if (test == "ds") {
+    t_test1 <- t.test(acc_res~rem,data=test_dat)
+    t_test2 <- t.test(spe_res~rem,data=test_dat)
+    t_test3 <- t.test(macc_res~rem,data=test_dat)
+    t_test4 <- t.test(mspe_res~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+    templist <- c(templist,"t_test4")
+  } else {
+    t_test1 <- t.test(acc_res~rem,data=test_dat)
+    t_test2 <- t.test(spe_res~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+  }
+  
+  templist <- mget(templist)
+  assign(paste(test,"list2",sep="_"),templist)
+}
 
 
+# plots: age-matched samples ----
+# loop for making trajectory plots but only with data that is in the age-matched samples
+
+new_texts <- paste0(test_names,"_list2")
+new_texts <- setdiff(new_texts,paste0(c("tap","mpraxis","ds","pcet"),"_list2"))   # keep these out of the loop because they have dif cols than the rest of the tests
+new_tests <- mget(new_texts)
+
+crossPlots_age <- list()                                         # [cross]sectional [Plots] for [age]-matched samples
+ct <- 1
+for (i in 1:length(new_tests)) {
+  acc_ct <- 2*ct-1
+  spe_ct <- 2*ct
+  
+  test <- new_tests[[i]][[3]] %>% 
+    mutate(sex_remote = paste(sex,remote))
+  
+  # retrieve test name  -- then use Noah's code to get plot and axis titles
+  test_name <- names(unlist(new_tests[i]))[1]
+  test_split <- str_split(test_name,pattern = "_")[[1]]
+  test_prefix <- test_split[1]
+  
+  Plot_title <- Test_map %>% 
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  N.df <- test %>% 
+    group_by(sex_remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
+    arrange(sex_remote_N)
+  
+  # acc plot
+  measure_names <- test[1,grepl("measure",colnames(test))]
+  
+  ylabel1 <- measure_names[1,1]
+  ylabel1 <- str_split(ylabel1,pattern = "_")[[1]][2]
+  ylabel1 <- Metric_map %>%
+    filter(Suffix == paste0("_",ylabel1)) %>%
+    pull(Label)
+  
+  crossPlots_age[[acc_ct]] <- test %>% 
+    left_join(N.df) %>% 
+    filter(!is.na(sex_remote_N)) %>% 
+    ggplot(aes_string(x = "age",y = names(test)[21],color = "sex_remote_N")) + 
+    geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel1,title = Plot_title,color = "") +
+    scale_x_continuous(limits = c(5,90)) +
+    scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  
+  # spe plot 
+  ylabel2 <- measure_names[1,2]
+  ylabel2 <- str_split(ylabel2,pattern = "_")[[1]][2]
+  ylabel2 <- Metric_map %>%
+    filter(Suffix == paste0("_",ylabel2)) %>%
+    pull(Label)
+  
+  crossPlots_age[[spe_ct]] <- test %>%
+    left_join(N.df) %>%
+    filter(!is.na(sex_remote_N)) %>% 
+    ggplot(aes_string(x = "age",y = names(test)[22],color = "sex_remote_N")) + 
+    geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel2,title = Plot_title,color = "") +
+    scale_x_continuous(limits = c(5,90)) +
+    scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  ct <- ct + 1
+}
+
+# * loop but for tap and mpraxis ----
+speed_texts <- c("tap_list2","mpraxis_list2")
+speed_tests <- mget(speed_texts)
+
+ct <- 25
+for (i in 1:length(speed_tests)) {
+  test <- speed_tests[[i]][[3]] %>% 
+    mutate(sex_remote = paste(sex,remote))
+  
+  # retrieve test name  -- then use Noah's code to get plot and axis titles
+  test_name <- names(unlist(speed_tests[i]))[1]
+  test_split <- str_split(test_name,pattern = "_")[[1]]
+  test_prefix <- test_split[1]
+  
+  Plot_title <- Test_map %>% 
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  N.df <- test %>% 
+    group_by(sex_remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
+    arrange(sex_remote_N)
+  
+  ylabel <- test[1,grepl("measure",colnames(test))]
+  
+  # spe plot 
+  ylabel <- str_split(ylabel,pattern = "_")[[1]][2]
+  ylabel <- Metric_map %>%
+    filter(Suffix == paste0("_",ylabel)) %>%
+    pull(Label)
+  
+  crossPlots_age[[ct]] <- test %>%
+    left_join(N.df) %>%
+    filter(!is.na(sex_remote_N)) %>% 
+    ggplot(aes_string(x = "age",y = names(test)[19],color = "sex_remote_N")) + 
+    geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") +
+    scale_x_continuous(limits = c(5,90)) +
+    scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  ct <- ct + 1
+}
 
 
+# * ds and pcet graphs ----
 
+test <- ds_list2[[3]] %>% 
+  mutate(sex_remote = paste(sex,remote))
+
+Plot_title <- Test_map %>% 
+  filter(Prefix == "ds") %>% 
+  pull(Test_name)
+
+N.df <- test %>% 
+  group_by(sex_remote) %>% 
+  dplyr::summarize(n = n()) %>% 
+  mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
+  arrange(sex_remote_N)
+
+# acc plot
+measure_names <- test[1,grepl("measure",colnames(test))]
+
+ylabel1 <- measure_names[1,1]
+ylabel1 <- str_split(ylabel1,pattern = "_")[[1]][2]
+ylabel1 <- Metric_map %>%
+  filter(Suffix == paste0("_",ylabel1)) %>%
+  pull(Label)
+
+crossPlots_age[[ct]] <- test %>% 
+  left_join(N.df) %>% 
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[25],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel1,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+# spe plot 
+ylabel2 <- measure_names[1,2]
+ylabel2 <- str_split(ylabel2,pattern = "_")[[1]][2]
+ylabel2 <- Metric_map %>%
+  filter(Suffix == paste0("_",ylabel2)) %>%
+  pull(Label)
+
+crossPlots_age[[ct]] <- test %>%
+  left_join(N.df) %>%
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[26],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel2,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+# mem acc plot
+Plot_title <- paste(Plot_title,"(Memory)")
+
+crossPlots_age[[ct]] <- test %>% 
+  left_join(N.df) %>% 
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[27],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel1,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+# mem spe plot 
+
+crossPlots_age[[ct]] <- test %>%
+  left_join(N.df) %>%
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[28],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel2,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+# pcet
+
+test <- pcet_list2[[3]] %>% 
+  mutate(sex_remote = paste(sex,remote))
+
+Plot_title <- Test_map %>% 
+  filter(Prefix == "pcet") %>% 
+  pull(Test_name)
+
+N.df <- test %>% 
+  group_by(sex_remote) %>% 
+  dplyr::summarize(n = n()) %>% 
+  mutate(sex_remote_N = factor(paste0(sex_remote,": ","N = ",n))) %>% 
+  arrange(sex_remote_N)
+
+# cat plot
+measure_names <- test[1,grepl("measure",colnames(test))]
+
+ylabel1 <- measure_names[1,1]
+ylabel1 <- str_split(ylabel1,pattern = "_")[[1]][2]
+ylabel1 <- Metric_map %>%
+  filter(Suffix == paste0("_",ylabel1)) %>%
+  pull(Label)
+
+crossPlots_age[[ct]] <- test %>% 
+  left_join(N.df) %>% 
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[23],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel1,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+# acc2 plot
+ylabel2 <- measure_names[1,2]
+ylabel2 <- str_split(ylabel2,pattern = "_")[[1]][2]
+ylabel2 <- Metric_map %>%
+  filter(Suffix == paste0("_",ylabel2)) %>%
+  pull(Label)
+
+crossPlots_age[[ct]] <- test %>% 
+  left_join(N.df) %>% 
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[24],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel2,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+# spe plot 
+ylabel3 <- measure_names[1,3]
+ylabel3 <- str_split(ylabel3,pattern = "_")[[1]][2]
+ylabel3 <- Metric_map %>%
+  filter(Suffix == paste0("_",ylabel3)) %>%
+  pull(Label)
+
+crossPlots_age[[ct]] <- test %>%
+  left_join(N.df) %>%
+  filter(!is.na(sex)) %>% 
+  ggplot(aes_string(x = "age",y = names(test)[25],color = "sex_remote_N")) + 
+  geom_point(size = .6) + geom_smooth(aes(fill=sex_remote_N),alpha=0.2) + labs(x = "Age",y = ylabel3,title = Plot_title,color = "") +
+  scale_x_continuous(limits = c(5,90)) +
+  scale_color_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  scale_fill_manual(values = c("#ca0020","#f4a582","#0571b0","#92c5de"),name="") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size=5),
+        plot.margin = margin(1,1,1,1,unit = "cm"))
+
+ct <- ct + 1
+
+
+pdf("plots/age_matched/cross_plots10Mar22.pdf")
+for (i in 1:length(crossPlots_age)){
+  print(crossPlots_age[[i]])
+}
+dev.off()
+
+# adt -- acc   :)
+# cpf -- acc   :)
+# cpt -- spe   :)
+# ds -- spe
+# er40 -- acc, spe   :)
+# gng -- acc, spe   :)
+# lnb -- speed
+# plot -- acc
+# pmat -- acc
+# pvrt -- acc, spe   :)
+# tap -- spe
+# volt -- acc
 
 
 
