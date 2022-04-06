@@ -45,11 +45,13 @@ dat <- dat[-which(dat$bblid > 1000000),]
 # exclude the 103 year old for now
 dat <- dat[-which(dat$age >100),]
 
+notval <- c("N")
+colors <- c("#6E4230", "#BF9660", "#065C50", "#48B0A2")
 
+datbbl <- dat[!is.na(dat$bblid),]
 
 
 # * separating out into tasks ----
-notval <- c("N","F","V3")
 
 mpraxis <- cbind(demo, dat[,grepl("mpraxis",colnames(dat))]) # RTCR
 mpraxis <- mpraxis[!is.na(mpraxis$mpraxis_rtcr),]
@@ -151,55 +153,185 @@ edisc
 
 # (2) Plots comparing sex and platform with age on x-axis (noting n's) ----
 
-# * (i) accuracy (adt,cpf,cpt,cpw,er40,lnb,medf,plot,pmat,pvrt,volt) ----
-colors <- c("#6E4230", "#BF9660", "#065C50", "#48B0A2")
+# using Noah's code for my data
 
-acc_texts <- c("adt","cpf","cpt","cpw","digsym","dsm","er40","gng","lnb","medf",
-               "pcet_cat","pcet_acc2","plot","pmat","pvrt","volt")          # no aim or disc for now, no data, no tap bc not sure what to do, no mpraxis (only rt)
-acc_tests <- mget(acc_texts)
+dat2 <- datbbl %>% 
+  dplyr::select(bblid,test_sessions.datasetid,test_sessions.siteid, 
+                test_sessions.famid, test_sessions.subid, age, test_sessions_v.battery, 
+                dob, dotest, test_sessions_v.education, test_sessions_v.feducation,
+                sex, test_sessions_v.handedness, test_sessions_v.meducation, platform, remote,
+                adt_valid, adt_pc, adt_rtcr, 
+                aim_valid, aim_tot, aim_totrt,
+                cpf_valid, cpf_cr, cpf_w_rtcr, 
+                cpt_valid, cpt_ptp, cpt_tprt,
+                cpw_valid, cpw_cr, cpw_w_rtcr,
+                digsym_valid, ds_cor, ds_corrt, ds_memcr, ds_mcrrt,
+                er40_valid, er40_cr, er40_rtcr, 
+                gng_valid, gng_cr, gng_rtcr,
+                lnb_valid, lnb_mcr, lnb_mrtc,
+                medf_valid, medf_pc, medf_rtcr, 
+                mpraxis_valid, mpraxis_rtcr, 
+                pcet_valid, pcet_cat, pcet_acc2, pcet_rtcr, 
+                plot_valid, plot_pc, plot_rtcr,
+                pmat_valid, pmat_pc, pmat_rtcr,
+                pvrt_valid, pvrt_cr, pvrt_rtcr,
+                tap_valid, tap_tot, tap_valid, 
+                volt_valid, volt_cr, volt_w_rtcr) %>%
+  mutate(sex = ifelse(sex == "F","Female","Male")) %>% 
+  mutate(remote = ifelse(platform == "webcnp","In-person","Remote")) %>% 
+  mutate(sex_remote = paste(sex,remote))
 
-plotlist <- list()
-nnn <- list()
-for (i in 1:length(acc_texts)) {        # still not satisfied about the nnn part
-  test <- acc_tests[[i]]
-  cr_pc <- ifelse(str_detect(names(test)[5],"cat"),"Categories Achieved",
-                  ifelse(str_detect(names(test)[5],"acc2"),"Acc2 Score",
-                         ifelse(str_detect(names(test)[5],"ptp"),"Percent True Positive",
-                                ifelse(str_detect(names(test)[5],"pc"),"Percent Correct","Total Correct"))))
-  names(test)[5] <- "acc"
-  test$finp <- ifelse(test$sex=="F" & test$remote == 0,test$acc,NA)
-  test$frem <- ifelse(test$sex=="F" & test$remote == 1,test$acc,NA)
-  test$minp <- ifelse(test$sex=="M" & test$remote == 0,test$acc,NA)
-  test$mrem <- ifelse(test$sex=="M" & test$remote == 1,test$acc,NA)
-  
-  nnn[[i]] <- c(sum(!is.na(test$finp)),
-                sum(!is.na(test$frem)),
-                sum(!is.na(test$minp)),
-                sum(!is.na(test$mrem)))
-  
-  p <- ggplot(test,aes(x=age)) +
-    scale_color_manual(values=colors) +
-    geom_point(aes(y=finp, color=paste("Female In-person, n =",nnn[[i]][1])),size=.8) +
-    geom_point(aes(y=frem, color=paste("Female Remote, n =",nnn[[i]][2])),size=.8) +
-    geom_point(aes(y=minp, color=paste("Male In-person, n =",nnn[[i]][3])),size=.8) +
-    geom_point(aes(y=mrem, color=paste("Male Remote, n =",nnn[[i]][4])),size=.8) +
-    geom_smooth(aes(y=finp, color=paste("Female In-person, n =",nnn[[i]][1])),se=F,size=1) +
-    geom_smooth(aes(y=frem, color=paste("Female Remote, n =",nnn[[i]][2])),se=F,size=1) +
-    geom_smooth(aes(y=minp, color=paste("Male In-person, n =",nnn[[i]][3])),se=F,size=1) +
-    geom_smooth(aes(y=mrem, color=paste("Male Remote, n =",nnn[[i]][4])),se=F,size=1) +
-    theme_minimal() +
-    theme(legend.title = element_blank()) +
-    labs(x = "Age",
-         y = "Percent Correct",
-         title = paste0(str_to_upper(acc_texts[i]), " Accuracy (as ", cr_pc, ") across age, sex and platform")) +
-    scale_x_continuous(limits = c(5,105))
-  
-  plotlist[[i]] <- p
+colnames(dat2)[grep("digsym",colnames(dat2))] <- "ds_valid"
+
+repeats_list <- dat2 %>% 
+  group_by(bblid) %>% 
+  filter(n() > 1) %>%
+  arrange(dotest) %>% 
+  ungroup() %>% 
+  group_split(bblid)
+
+find_last_test <- function(df_by_bblid){      # if a bblid's last test is remote, take the most recent remote test data
+  if(any(df_by_bblid$remote == "Remote")){
+    last_test <- df_by_bblid %>% 
+      arrange(dotest) %>% 
+      filter(remote == "Remote") %>% 
+      slice_tail(n = 1)
+  } else{
+    last_test <- df_by_bblid %>%              # if a bblid's last tests is in-person, take last in-person data
+      arrange(dotest) %>% 
+      slice_tail(n = 1)
+  }
+  return(last_test)
+}                                             # each bblid will have either remote OR in-person test data, but not both
+
+Last_tests <- map_dfr(repeats_list,find_last_test) # 1712 x 69, 2/22/22
+
+cnb_cross <- dat2 %>%    # combining all info from bblid's that only have one row of data
+  group_by(bblid) %>% 
+  filter(n() == 1) %>%
+  arrange(dotest) %>% 
+  ungroup() %>% 
+  bind_rows(Last_tests) %>%    # attaching all data from last_tests at the end
+  filter(!is.na(bblid))
+
+# get rid of outliers
+
+tests <- cnb_cross %>%   # bblid, age, dob, dotest, sex, _valid
+  dplyr::select(!(matches("bblid") | matches("^test") | "age" | "dob" | "dotest" | "sex" | "platform" | "remote" | matches("_valid$") | matches("^aim") | "sex_remote")) %>%    # ^[this]: anything beginning with [this]; [this]$: anything ending with [this]
+  colnames()
+for(test in tests){
+  cnb_cross[[test]] <- ifelse(cnb_cross[[test]] > mean(cnb_cross[[test]],na.rm = TRUE) + 6*sd(cnb_cross[[test]],na.rm = TRUE),mean(cnb_cross[[test]],na.rm = TRUE) + 6*sd(cnb_cross[[test]],na.rm = TRUE),cnb_cross[[test]])
+  cnb_cross[[test]] <- ifelse(cnb_cross[[test]] < mean(cnb_cross[[test]],na.rm = TRUE) - 6*sd(cnb_cross[[test]],na.rm = TRUE),mean(cnb_cross[[test]],na.rm = TRUE) - 6*sd(cnb_cross[[test]],na.rm = TRUE),cnb_cross[[test]])
 }
 
-pdf("plots/acc_plots.pdf")
-for (i in 1:length(acc_texts)) {
-  print(plotlist[[i]])
+response_vars <- cnb_cross %>% 
+  dplyr::select(!(contains("valid"))) %>% 
+  dplyr::select(adt_pc:volt_w_rtcr) %>% 
+  colnames()
+
+# exclude aim for now (DISC tasks excluded already)
+response_vars <- setdiff(response_vars,c("aim_tot", "aim_totrt"))
+
+Test_map <- data.frame('Prefix' = c("er40","pvrt","volt","cpf","cpw","gng","mpraxis","pcet","pmat","medf","adt","plot","tap","cpt","lnb","volt","plot","ds"),
+                       "Test_name" = c("Penn Emotion Recognition Test","Penn Verbal Reasoning Test","Visual Object Learning Test","Penn Face Memory Test",'Penn Word Memory Test',
+                                       "Go-No-Go Test","Motor Praxis Test","Penn Conditional Exclusion Test","Penn Matrix Analysis Test","Measured Emotion Differentiation Test",
+                                       "Age Differentiation Test","Penn Line Orientation Test","Penn Computerized Finger Tapping Test","Penn Continuous Performance Test",
+                                       "Letter-N-Back","Visual Object Learning Test","Penn Line Orientation Test","Digit Symbol Search"))
+
+Metric_map <- data.frame("Suffix" = c("_cor","_cr","_corrt","_rtcr","_tot","_acc2","_tprt","_ptp","_mcr","_mrtc","_pc","_mp2rtcr","_cat","_mrtc","_tp","_memcr","_mcrrt"),
+                         "Label" = c("Correct Responses","Correct Responses","Median Response Time \n Correct Responses (ms)","Median Response Time \n Correct Responses (ms)","Average Taps \n (Dominant and Non-dominant hand added together)",
+                                     "Accuracy","Median Response Time \n True Positives (ms)","True Positive (%)","Total True Positive Responses","Median Response Time \n Correct Responses",
+                                     "Correct Responses (%)","Median Response Time \n Correct Responses (ms)","Categories Achieved","Median Response Time \n Correct Responses (ms)",
+                                     "True Positive Responses","Correct Responses","Median Response Time \n Correct Responses (ms)"))
+
+
+
+
+
+
+Pall_rec <- list()                                         # [L]ongitudinal [P]lots for [all] and [rec]ent dates
+cntr <- 1
+for(test in response_vars){
+  allcnt <- 2*cntr-1
+  reccnt <- 2*cntr
+  
+  test_split <- str_split(test,pattern = "_")[[1]]
+  test_prefix <- test_split[1]
+  test_suffix <- paste0("_",test_split[length(test_split)])
+  
+  Plot_title <- Test_map %>% 
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  if (test %in% c("ds_memcr", "ds_mcrrt")) {
+    Plot_title <- paste(Plot_title, "(Memory)")
+  }
+  
+  ylabel <- Metric_map %>% 
+    filter(Suffix == test_suffix) %>% 
+    pull(Label)
+  
+  N.df <- cnb_cross[,c(test,"remote","age")] %>% 
+    filter(if_all(everything(), ~ !is.na(.))) %>% 
+    group_by(remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(remote_N = factor(paste0(remote,": ","N = ",n))) %>% 
+    arrange(remote_N)
+  
+
+  Pall_rec[[allcnt]] <- cnb_cross %>% 
+    left_join(N.df) %>% 
+    filter(!is.na(remote_N)) %>% 
+    ggplot(aes_string(x = "age",y = test,color = "remote_N")) + 
+    geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") +
+    scale_x_continuous(limits = c(5,90)) +
+    scale_color_manual(values = c("#EB6746","#4ED3ED")) + 
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  
+  # recent data (2016 and on)
+  
+  pt2 <- Test_map %>%                       # [p]lot [t]itle 2
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  pt2 <- ifelse(test %in% c("ds_memcr", "ds_mcrrt"),paste(pt2, "(Memory, 2016 and on)"),paste(pt2,"(2016 and on)"))
+  
+  ylabel2 <- Metric_map %>% 
+    filter(Suffix == test_suffix) %>% 
+    pull(Label)
+  
+  N.df <- cnb_cross[,c(test,"remote","age","dotest")] %>% 
+    filter(if_all(everything(), ~ !is.na(.))) %>% 
+    filter(dotest > as.Date("2015-12-31")) %>% 
+    group_by(remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(remote_N = factor(paste0(remote,": ","N = ",n))) %>% 
+    arrange(remote_N)
+  
+
+  Pall_rec[[reccnt]] <- cnb_cross %>% 
+    left_join(N.df) %>% 
+    filter(!is.na(remote_N)) %>% 
+    filter(dotest > as.Date("2015-12-31")) %>% 
+    ggplot(aes_string(x = "age",y = test,color = "remote_N")) + 
+    geom_point(size = .6) + geom_smooth(se = FALSE) + labs(x = "Age",y = ylabel,title = pt2,color = "") + 
+    scale_x_continuous(limits = c(5,90)) +
+    scale_color_manual(values = c("#EB6746","#4ED3ED")) +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  cntr <- cntr + 1
+}
+
+pdf("plots/fromNoahscode/cross_plots_onlyBBL_4April22.pdf",height = 7,width = 10)
+for (i in 1:length(Pall_rec)){
+  print(Pall_rec[[i]])
 }
 dev.off()
 
@@ -210,2315 +342,16 @@ dev.off()
 
 
 
-# * (ii) speed (adt,cpf,cpt,cpw,er40,lnb,medf,mpraxis,pcet,plot,pmat,pvrt,volt) ----
 
-# * * (a) ADT speed ----
-temp <- adt %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(adt_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
 
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
 
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
 
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
 
-adt_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "ADT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
 
-ggsave("plots/ADT_spe.pdf")
 
 
-# * * (b) CPF speed ----
-temp <- cpf %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(cpf_w_rtcr),n=n())    # Tyler said to use weighted response time measures here
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
 
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
 
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpf_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPF Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPF_spe.pdf")
-
-
-# * * (c) CPT speed ----
-
-temp <- cpt %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpt_tprt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpt_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPT_spe.pdf")
-
-
-
-# * * (d) CPW speed ----
-
-# no remote data
-
-temp <- cpw %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpw_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpw_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPW Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPW_spe.pdf")
-
-
-
-# * * (e) ER40 speed ----
-temp <- er40 %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(er40_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-er40_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "ER40 Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/ER40_spe.pdf")
-
-
-# * * (f) LNB speed ----
-temp <- lnb %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(lnb_mrtc),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-lnb_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "LNB Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/LNB_spe.pdf")
-
-
-# * * (g) MEDF speed ----
-temp <- medf %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(medf_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-medf_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "MEDF Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/MEDF_spe.pdf")
-
-
-# * * (h) MPRAXIS speed ----
-temp <- mpraxis %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(mpraxis_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-mpraxis_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "MPRAXIS Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/MPRAXIS_spe.pdf")
-
-
-# * * (i) PCET speed ----
-temp <- pcet %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pcet_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pcet_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PCET Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PCET_spe.pdf")
-
-
-# * * (j) PLOT speed ----
-temp <- plot %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(plot_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-plot_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PLOT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PLOT_spe.pdf")
-
-
-# * * (k) PMAT speed ----
-temp <- pmat %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pmat_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pmat_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PMAT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PMAT_spe.pdf")
-
-
-# * * (l) PVRT speed ----
-
-# no remote data
-
-temp <- pvrt %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(pvrt_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pvrt_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PVRT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PVRT_spe.pdf")
-
-
-
-# * * (m) VOLT speed ----
-temp <- volt %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(volt_w_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-volt_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "VOLT Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/VOLT_spe.pdf")
-
-
-
-# * * (n) AIM speed ----
-temp <- aim %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(aim_totrt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-aim_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "AIM Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/AIM_spe.pdf")
-
-
-
-# * * (o) DIGSYM speed ----
-temp <- digsym %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(dscorrt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-digsym_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "DIGSYM Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/DIGSYM_spe.pdf")
-
-
-
-# * * (p) DIGSYM (memory) speed ----
-temp <- dsm %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(dsmcrrt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-dsm_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "DIGSYM (memory) Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/DIGSYMmem_spe.pdf")
-
-
-
-# * * (q) GNG speed ----
-temp <- gng %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(gng_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-gng_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "GNG Speed (as Response time) across age, sex and platform") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/GNG_spe.pdf")
-
-
-
-
-
-# (3) 2020-present: Plots comparing sex and platform with age on x-axis (noting n's) ----
-
-# * (i) getting rid of extra dates ----
-adt_c <- adt[adt$dotest > as.Date("2019-12-31"),]    # "c" for COVID cause :P  (>u<)
-aim_c <- aim[aim$dotest > as.Date("2019-12-31"),]
-cpf_c <- cpf[cpf$dotest > as.Date("2019-12-31"),]
-cpt_c <- cpt[cpt$dotest > as.Date("2019-12-31"),]
-cpw_c <- cpw[cpw$dotest > as.Date("2019-12-31"),]
-digsym_c <- digsym[digsym$dotest > as.Date("2019-12-31"),]
-dsm_c <- dsm[dsm$dotest > as.Date("2019-12-31"),]
-er40_c <- er40[er40$dotest > as.Date("2019-12-31"),]
-gng_c <- gng[gng$dotest > as.Date("2019-12-31"),]
-lnb_c <- lnb[lnb$dotest > as.Date("2019-12-31"),]
-medf_c <- medf[medf$dotest > as.Date("2019-12-31"),]
-mpraxis_c <- mpraxis[mpraxis$dotest > as.Date("2019-12-31"),]
-pcet_cat_c <- pcet_cat[pcet_cat$dotest > as.Date("2019-12-31"),]
-pcet_acc2_c <- pcet_acc2[pcet_acc2$dotest > as.Date("2019-12-31"),]
-plot_c <- plot[plot$dotest > as.Date("2019-12-31"),]
-pmat_c <- pmat[pmat$dotest > as.Date("2019-12-31"),]
-pvrt_c <- pvrt[pvrt$dotest > as.Date("2019-12-31"),]
-volt_c <- volt[volt$dotest > as.Date("2019-12-31"),]
-
-# * (ii) accuracy (adt,cpf,cpt,cpw,er40,lnb,medf,plot,pmat,pvrt,volt) ----
-
-# * * (a) ADT accuracy ----
-temp <- adt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(adt_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-adt_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent Correct",
-       title = "ADT Accuracy (as Percent Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/ADT_c_acc.pdf")
-
-
-# * * (b) CPF accuracy ----
-temp <- cpf_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(cpf_cr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpf_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "CPF Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPF_c_acc.pdf")
-
-
-# * * (c) CPT accuracy ----
-
-temp <- cpt_c %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpt_ptp),n=n())
-names(temp) <- c("age","sex","remote","mptp","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mptp,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mptp,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mptp,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mptp,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpt_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent True Positive",
-       title = "CPT Accuracy (as Percent true Positive) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPT_c_acc.pdf")
-
-
-
-# * * (d) CPW accuracy ----
-
-temp <- cpw_c %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpw_cr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpw_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "CPW Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPW_c_acc.pdf")
-
-
-
-# * * (e) ER40 accuracy ----
-temp <- er40_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(er40_cr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-er40_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "ER40 Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/ER40_c_acc.pdf")
-
-
-# * * (f) LNB accuracy ----
-temp <- lnb_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(lnb_mcr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-lnb_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "LNB Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/LNB_c_acc.pdf")
-
-
-# * * (g) MEDF accuracy ----
-temp <- medf_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(medf_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-medf_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent Correct",
-       title = "MEDF Accuracy (as Percent Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/MEDF_c_acc.pdf")
-
-
-# * * (h) PCET accuracy (CAT) ----
-temp <- pcet_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pcet_cat),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pcet_cgg1.1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Catergories Achieved",
-       title = "PCET Accuracy (as Catergories Achieved) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PCET_c_acc1.pdf")
-
-
-# * * (i) PCET accuracy2 ----
-temp <- pcet_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pcet_acc2),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pcet_cgg1.2 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Accuracy2",
-       title = "PCET Accuracy (as Accuracy2) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PCET_c_acc2.pdf")
-
-
-# * * (j) PLOT accuracy ----
-temp <- plot_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(plot_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-plot_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent Correct",
-       title = "PLOT Accuracy (as Percent Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PLOT_c_acc.pdf")
-
-
-# * * (k) PMAT accuracy ----
-temp <- pmat_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pmat_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pmat_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent Correct",
-       title = "PMAT Accuracy (as Percent Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PMAT_c_acc.pdf")
-
-
-# * * (l) PVRT accuracy ----
-
-temp <- pvrt %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(pvrt_pc),n=n())
-names(temp) <- c("age","sex","remote","mpc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mpc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mpc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mpc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mpc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pvrt_gg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Percent Correct",
-       title = "PVRT Accuracy (as Percent Correct) across age, sex and platform") +
-  scale_x_continuous(breaks = seq(5,105, by=20))
-
-ggsave("plots/PVRT_c_acc.pdf")
-
-
-
-# * * (m) VOLT accuracy ----
-temp <- volt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(volt_cr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-volt_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "VOLT Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/VOLT_c_acc.pdf")
-
-
-
-# * * (n) AIM accuracy ----
-temp <- aim_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(aim_tot),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-aim_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "AIM Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/AIM_c_acc.pdf")
-
-
-
-# * * (o) DIGSYM accuracy ----
-temp <- digsym_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(dscor),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-digsym_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "DIGSYM Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/DIGSYM_c_acc.pdf")
-
-
-
-# * * (p) DIGSYM memory accuracy ----
-temp <- dsm_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(dsmemcr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-dsm_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "DIGSYM (memory) Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/DIGSYMmem_c_acc.pdf")
-
-
-
-# * * (q) GNG accuracy ----
-temp <- gng_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(gng_cr),n=n())
-names(temp) <- c("age","sex","remote","mtc","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mtc,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mtc,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mtc,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mtc,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-gng_cgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Total Correct",
-       title = "GNG Accuracy (as Total Correct) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/GNG_c_acc.pdf")
-
-
-
-
-# * (iii) speed (adt,cpf,cpt,cpw,er40,lnb,medf,mpraxis,pcet,plot,pmat,pvrt,volt) ----
-
-# * * (a) ADT speed ----
-temp <- adt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(adt_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-adt_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "ADT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/ADT_c_spe.pdf")
-
-
-# * * (b) CPF speed ----
-temp <- cpf_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(cpf_w_rtcr),n=n())    # Tyler said to use weighted response time measures here
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpf_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPF Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPF_c_spe.pdf")
-
-
-# * * (c) CPT speed ----
-
-temp <- cpt_c %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpt_tprt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpt_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPT_c_spe.pdf")
-
-
-
-# * * (d) CPW speed ----
-
-temp <- cpw_c %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(cpw_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-cpw_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "CPW Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/CPW_c_spe.pdf")
-
-
-
-# * * (e) ER40 speed ----
-temp <- er40_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(er40_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-er40_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "ER40 Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/ER40_c_spe.pdf")
-
-
-# * * (f) LNB speed ----
-temp <- lnb_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(lnb_mrtc),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-lnb_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "LNB Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/LNB_c_spe.pdf")
-
-
-# * * (g) MEDF speed ----
-temp <- medf_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(medf_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-medf_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "MEDF Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/MEDF_c_spe.pdf")
-
-
-# * * (h) MPRAXIS speed ----
-temp <- mpraxis_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(mpraxis_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-mpraxis_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "MPRAXIS Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/MPRAXIS_c_spe.pdf")
-
-
-# * * (i) PCET speed ----
-temp <- pcet_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pcet_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pcet_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PCET Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PCET_c_spe.pdf")
-
-
-# * * (j) PLOT speed ----
-temp <- plot_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(plot_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-plot_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PLOT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PLOT_c_spe.pdf")
-
-
-# * * (k) PMAT speed ----
-temp <- pmat_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(pmat_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pmat_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PMAT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PMAT_c_spe.pdf")
-
-
-# * * (l) PVRT accuracy ----
-
-temp <- pvrt_c %>%
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>%
-  dplyr::summarise(mean=mean(pvrt_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-pvrt_sgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "PVRT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/PVRT_c_spe.pdf")
-
-
-
-# * * (m) VOLT accuracy ----
-temp <- volt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(volt_w_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-volt_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "VOLT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/VOLT_c_spe.pdf")
-
-
-
-# * * (n) AIM accuracy ----
-temp <- aim_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(aim_totrt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-aim_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "AIM Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/aim_c_spe.pdf")
-
-
-
-# * * (o) DIGSYM accuracy ----
-temp <- digsym_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(dscorrt),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-digsym_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "DIGSYM Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/DIGSYM_c_spe.pdf")
-
-
-
-# * * (m) VOLT accuracy ----
-temp <- volt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(volt_w_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-volt_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "VOLT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/VOLT_c_spe.pdf")
-
-
-
-# * * (m) VOLT accuracy ----
-temp <- volt_c %>% 
-  group_by(test_sessions_v.age,test_sessions_v.gender,remote) %>% 
-  dplyr::summarise(mean=mean(volt_w_rtcr),n=n())
-names(temp) <- c("age","sex","remote","mrtcr","n")
-temp$female_inp <- ifelse(temp$sex == "F" & temp$remote == 0, temp$mrtcr,NA)
-temp$female_rem <- ifelse(temp$sex == "F" & temp$remote == 1, temp$mrtcr,NA)
-temp$male_inp <- ifelse(temp$sex == "M" & temp$remote == 0, temp$mrtcr,NA)
-temp$male_rem <- ifelse(temp$sex == "M" & temp$remote == 1, temp$mrtcr,NA)
-
-finp <- temp[!is.na(temp$female_inp),c(1,6)]
-frem <- temp[!is.na(temp$female_rem),c(1,7)]
-minp <- temp[!is.na(temp$male_inp),c(1,8)]
-mrem <- temp[!is.na(temp$male_rem),c(1,9)]
-
-new <- merge(finp,frem,by="age",all=T)
-new <- merge(new,minp,by="age",all=T)
-new <- merge(new,mrem,by="age",all=T)
-
-nnn <- c(sum(temp[temp$sex=="F" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="F" & temp$remote=="1","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="0","n"]),
-         sum(temp[temp$sex=="M" & temp$remote=="1","n"]))
-
-volt_scgg1 <- ggplot(new,aes(x=age)) +
-  scale_color_manual(values=colors) +
-  geom_point(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1]))) +
-  geom_point(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2]))) +
-  geom_point(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3]))) +
-  geom_point(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4]))) +
-  geom_smooth(aes(y=female_inp, color=paste("Female In-person, n =",nnn[1])),se=F) +
-  geom_smooth(aes(y=female_rem, color=paste("Female Remote, n =",nnn[2])),se=F) +
-  geom_smooth(aes(y=male_inp, color=paste("Male In-person, n =",nnn[3])),se=F) +
-  geom_smooth(aes(y=male_rem, color=paste("Male Remote, n =",nnn[4])),se=F) +
-  theme_minimal() +
-  theme(legend.title = element_blank()) +
-  labs(x = "Age",
-       y = "Response Time (ms)",
-       title = "VOLT Speed (as Response time) across age, sex and platform (2019 and on)") +
-  scale_x_continuous(limits = c(5,105))
-
-ggsave("plots/individual/VOLT_c_spe.pdf")
 
 
 
@@ -2526,6 +359,89 @@ ggsave("plots/individual/VOLT_c_spe.pdf")
 
 
 # (4) Statistical Analysis: regress out age and look for significant differences across platforms ----
+
+# age-matching code from Tyler ----
+# i have to do some age-matching per test
+
+demos <- cnb_cross %>% 
+  dplyr::select(bblid:remote)
+
+test_names <- sort(unique(sapply(str_split(response_vars,pattern = "_"),"[[",1)))
+
+t_tests <- list()
+cntr <- 1
+for (test in test_names) {
+  templist <- c()
+  
+  test_dat <- cbind(demos, cnb_cross[,grepl(test, colnames(cnb_cross))])
+  last_col <- tail(colnames(test_dat),1)
+  test_dat <- test_dat %>%
+    drop_na(last_col) %>% 
+    drop_na(age)
+  
+  test_rem <- test_dat %>% 
+    filter(remote == "Remote") %>% 
+    mutate(rem = 1)
+  n_rem <- dim(test_rem)[1]
+  
+  test_inp <- test_dat %>% 
+    filter(remote == "In-person") %>% 
+    mutate(rem = 0)
+  
+  test_dat2 <- rbind(test_rem,test_inp)       # test_dat recombined after adding var, rem = c(0,1)
+  
+  set.seed(2)
+  mod <- matchit(rem~age+sex,data=test_dat2,ratio=1)    # matching by age and sex for now
+  test_inperson <- test_dat2[mod$match.matrix,]
+  n_inp <- dim(test_inperson)[1]
+  
+  test_dat <- rbind(test_rem,test_inperson)
+  
+  templist <- c(templist,"n_rem","n_inp","test_dat")
+  
+  if (test %in% c("tap","mpraxis")) {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+  }  else if (test == "pcet") {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    t_test3 <- t.test(test_dat[,20]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+  } else if (test == "ds") {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    t_test3 <- t.test(test_dat[,20]~rem,data=test_dat)
+    t_test4 <- t.test(test_dat[,21]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+    templist <- c(templist,"t_test3")
+    templist <- c(templist,"t_test4")
+  } else {
+    t_test1 <- t.test(test_dat[,18]~rem,data=test_dat)
+    t_test2 <- t.test(test_dat[,19]~rem,data=test_dat)
+    templist <- c(templist,"t_test1")
+    templist <- c(templist,"t_test2")
+  }
+  
+  templist <- mget(templist)
+  assign(paste(test,"list",sep="_"),templist)
+  t_tests[[cntr]] <- templist
+  cntr <- cntr+1
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 # * (i) rename columns in tests so they are uniform ----
 newadt <- adt_c[,c(2,3,6,7,10,13,20,23,24)]
@@ -2621,6 +537,9 @@ sumAcc <- c(sumAcc,"nAD")
 
 
 # old code
+
+
+
 test <- testsAcc[[i]]
 name <- paste0(textsAcc[i],"sumAcc")
 sumAcc <- c(textsAcc[i])
