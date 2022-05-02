@@ -850,7 +850,7 @@ for (test in test_names) {
       drop_na(colnames(test_dat)[ncol(test_dat)-1])
   }
   
-  # regressing age out (and possibly avg parent edu as well?) - not yet 3/10/22
+  # regressing sex out (and possibly avg parent edu as well?) - not yet 3/10/22
   if (test %in% c("tap","mpraxis")) {
     test_dat$measure_speed <- names(test_dat)[ncol(test_dat)]
     
@@ -1284,6 +1284,151 @@ dev.off()
 # pvrt -- acc, spe   :)
 # tap -- spe
 # volt -- acc
+
+
+
+
+
+
+
+
+
+
+# testing out some new plot things
+
+
+Pall_rec <- list()                                         # [L]ongitudinal [P]lots for [all] and [rec]ent dates
+cntr <- 1
+for(test in response_vars){
+  allcnt <- 2*cntr-1
+  reccnt <- 2*cntr
+  
+  test_split <- str_split(test,pattern = "_")[[1]]
+  test_prefix <- test_split[1]
+  test_suffix <- paste0("_",test_split[length(test_split)])
+  
+  Plot_title <- Test_map %>% 
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  if (test %in% c("ds_memcr", "ds_mcrrt")) {
+    Plot_title <- paste(Plot_title, "(Memory)")
+  }
+  
+  ylabel <- Metric_map %>% 
+    filter(Suffix == test_suffix) %>% 
+    pull(Label) %>% 
+    paste0(", Sex-regressed Residuals")
+  
+  test_list <- paste(test_prefix,"list",sep="_")
+  test_list <- mget(test_list)[[1]]
+  test_dat <- test_list$test_dat_res
+  
+  N.df <- test_dat %>%    
+    filter(if_all(everything(), ~ !is.na(.))) %>% 
+    group_by(remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(remote_N = factor(paste0(remote,": ","N = ",n))) %>% 
+    arrange(remote_N)
+  
+  test_dat <- cbind(demos, cnb_cross[,test])
+  last_col <- tail(colnames(test_dat),1)
+  test_dat <- test_dat %>%
+    drop_na(last_col) %>% 
+    drop_na(age)
+  
+  # regressing sex out 
+  fit <- glm(test_dat[,ncol(test_dat)] ~ sex, data = test_dat)
+  test_dat$res <- scale(resid(fit))
+  test_dat$res <- ifelse(test_dat$res>6,6,test_dat$res)
+  test_dat$res <- ifelse(test_dat$res<(-6),-6,test_dat$res)
+  
+  # age-match
+  test_rem <- test_dat %>% 
+    filter(remote == "Remote") %>% 
+    mutate(rem = 1)
+  n_rem <- dim(test_rem)[1]
+  
+  test_inp <- test_dat %>% 
+    filter(remote == "In-person") %>% 
+    mutate(rem = 0)
+  
+  test_dat2 <- rbind(test_rem,test_inp)       # test_dat recombined after adding var, rem = c(0,1)
+  
+  set.seed(2)
+  mod <- matchit(rem~age+sex,data=test_dat2,ratio=1)    # matching by age and sex for now, is there a reason to match by sex if sex is already regressed out?
+  test_inperson <- test_dat2[mod$match.matrix,]
+  n_inp <- dim(test_inperson)[1]
+  
+  test_dat <- rbind(test_rem,test_inperson)
+  # up to here
+  
+  Pall_rec[[allcnt]] <- test_dat %>% 
+    left_join(N.df) %>% 
+    filter(!is.na(remote_N)) %>% 
+    ggplot(aes_string(x = "age",y = "res",color = "remote_N")) + 
+    geom_point(size = .6) + geom_smooth(aes(fill=remote_N),method="gam",alpha=0.2) + labs(x = "Age",y = ylabel,title = Plot_title,color = "") + # add method = "gam"
+    scale_x_continuous(limits = c(5,40)) +
+    scale_color_manual(values = c("#EB6746","#4ED3ED"),name="") + 
+    scale_fill_manual(values = c("#EB6746","#4ED3ED"),name="") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  # fit <- gam(test ~ s(age,k=3) + sex, data = test_dat) # possibly by = "gender"
+  # visreg(fit,"age", by="gender", main=paste(textsAcc[i],"LY"))
+  # see if gam provides p-value for interaction, if not, use linear models with squared and cubed terms 
+  
+  # recent data (2016 and on)
+  
+  pt2 <- Test_map %>%                       # [p]lot [t]itle 2
+    filter(Prefix == test_prefix) %>% 
+    pull(Test_name)
+  
+  pt2 <- ifelse(test %in% c("ds_memcr", "ds_mcrrt"),paste(pt2, "(Memory, 2016 and on)"),paste(pt2,"(2016 and on)"))
+  
+  ylabel2 <- Metric_map %>% 
+    filter(Suffix == test_suffix) %>% 
+    pull(Label) %>% 
+    paste0(", Sex-regressed Residuals")
+  
+  N.df <- test_dat %>% 
+    filter(if_all(everything(), ~ !is.na(.))) %>% 
+    filter(dotest > as.Date("2015-12-31")) %>% 
+    group_by(remote) %>% 
+    dplyr::summarize(n = n()) %>% 
+    mutate(remote_N = factor(paste0(remote,": ","N = ",n))) %>% 
+    arrange(remote_N)
+  
+  Pall_rec[[reccnt]] <- test_dat %>% 
+    left_join(N.df) %>% 
+    filter(!is.na(remote_N)) %>% 
+    filter(dotest > as.Date("2015-12-31")) %>% 
+    ggplot(aes_string(x = "age",y = "res",color = "remote_N")) + 
+    geom_point(size = .6) + geom_smooth(aes(fill=remote_N),method="gam",alpha=0.2) + labs(x = "Age",y = ylabel,title = pt2,color = "") + 
+    scale_x_continuous(limits = c(5,40)) +
+    scale_color_manual(values = c("#EB6746","#4ED3ED"),name="") +
+    scale_fill_manual(values = c("#EB6746","#4ED3ED"),name="") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size=5),
+          plot.margin = margin(1,1,1,1,unit = "cm"))
+  
+  cntr <- cntr + 1
+}
+
+pdf("plots/cross_plots_20Apr22.pdf",height = 7,width = 10)
+for (i in 1:length(Pall_rec)){
+  print(Pall_rec[[i]])
+}
+dev.off()
+
+
+
+
+
+
 
 
 
