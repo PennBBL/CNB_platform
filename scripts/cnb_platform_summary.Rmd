@@ -804,20 +804,16 @@ for (test in test_names) {
 
 
 
-
-
-
-```{r eq testing (2016~), include=F}
-e_tests_rec <- list()
+```{r eq testing, include=F}
+e_tests <- list()
 cntr <- 1
 for (test in test_names) {
   templist <- c()
   
   test_list <- paste(test,"list",sep="_")
   test_list <- mget(test_list)[[1]]
-  test_dat <- test_list$test_dat_res %>% 
-    filter(dotest > as.Date("2015-12-31"))
-  
+  test_dat <- test_list$test_dat_res
+
   test_rem <- test_dat %>% 
     filter(remote == "Remote") %>% 
     mutate(rem = 1)
@@ -834,8 +830,7 @@ for (test in test_names) {
   test_inperson <- test_dat2[mod$match.matrix,]
   n_inp <- dim(test_inperson)[1]
   
-  test_dat <- rbind(test_rem,test_inperson) %>% 
-    filter(!is.na(rem))
+  test_dat <- rbind(test_rem,test_inperson)
   
   templist <- c(templist,"n_rem","n_inp","test_dat")
   
@@ -867,12 +862,13 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
       } else {
         AB_p[1,num] <- NA
       }
+      
     }
     
     tAB_p <- AB_p %>%
@@ -923,7 +919,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(cat_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -934,7 +930,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -945,7 +941,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
       } else {
@@ -1012,7 +1008,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1023,7 +1019,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -1034,7 +1030,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(macc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
         
@@ -1045,7 +1041,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[4,num] <- eq_p
         
@@ -1096,7 +1092,249 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+
+        AB_p[1,num] <- eq_p
+
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+
+        AB_p[2,num] <- eq_p
+      } else {
+        AB_p[1,num] <- NA
+        AB_p[2,num] <- NA
+      }
+    }
+    
+    tAB_p <- AB_p %>%
+      kbl(caption = paste0("Age-binned Equivalence Tests for ", notest), align = rep("c", 8),
+          col.names = c("7-12","12-17","17-35")) %>%
+      kable_classic(full_width = F, html_font = "Cambria")
+    templist <- c(templist,"e_test1","e_test2","tAB_p")
+  }
+  
+  templist <- mget(templist)
+  assign(paste(test,"eqlist",sep="_"),templist)
+  e_tests[[cntr]] <- templist
+  cntr <- cntr+1
+}
+```
+
+
+
+
+```{r eq testing (2016~), include=F}
+e_tests_rec <- list()
+cntr <- 1
+for (test in test_names) {
+  templist <- c()
+  
+  test_list <- paste(test,"list",sep="_")
+  test_list <- mget(test_list)[[1]]
+  test_dat <- test_list$test_dat_res %>% 
+    filter(dotest > as.Date("2015-12-31"))
+  
+  test_rem <- test_dat %>% 
+    filter(remote == "Remote") %>% 
+    mutate(rem = 1)
+  n_rem <- dim(test_rem)[1]
+  
+  test_inp <- test_dat %>% 
+    filter(remote == "In-person") %>% 
+    mutate(rem = 0)
+  
+  test_dat2 <- rbind(test_rem,test_inp)       # test_dat recombined after adding var, rem = c(0,1)
+  
+  set.seed(2)
+  mod <- matchit(rem~age+sex,data=test_dat2,ratio=1)    # matching by age and sex for now
+  test_inperson <- test_dat2[mod$match.matrix,]
+  n_inp <- dim(test_inperson)[1]
+  
+  test_dat <- rbind(test_rem,test_inperson) %>% 
+    filter(!is.na(rem))
+  
+  templist <- c(templist,"n_rem","n_inp","test_dat")
+  
+  notest <- Test_map %>% 
+    filter(Prefix == test) %>% 
+    pull(Test_name)
+  
+  if (test %in% c("tap","mpraxis")) {
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    
+    e_test1 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    AB_p <- data.frame("age_7_12" = rep(NA,1),"age_12_17" = rep(NA,1),"age_17_35" = rep(NA,1))
+    rownames(AB_p) <- "spe"
+    
+    for (num in 1:3){
+      if (dim(temp_dat[which(temp_dat$rem == 1),])[1] > 5 &
+          dim(temp_dat[which(temp_dat$rem == 0),])[1] > 5) {
+        temp_dat <- test_dat %>% filter(age_bin == num)
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[1,num] <- eq_p
+      } else {
+        AB_p[1,num] <- NA
+      }
+    }
+    
+    tAB_p <- AB_p %>%
+      kbl(caption = paste0("Age-binned Equivalence Tests for ", notest), align = rep("c", 8),
+          col.names = c("7-12","12-17","17-35")) %>%
+      kable_classic(full_width = F, html_font = "Cambria")
+    
+    templist <- c(templist,"e_test1","tAB_p")
+  }  else if (test == "pcet") {
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(cat_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(cat_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(cat_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(cat_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(cat_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(cat_res))
+    
+    e_test1 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(acc2_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(acc2_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(acc2_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(acc2_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(acc2_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(acc2_res))
+    
+    e_test2 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    
+    e_test3 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    AB_p <- data.frame("age_7_12" = rep(NA,3),"age_12_17" = rep(NA,3),"age_17_35" = rep(NA,3))
+    rownames(AB_p) <- c("cat","acc2","spe")
+    
+    for (num in 1:3){
+      temp_dat <- test_dat %>% filter(age_bin == num)
+      if (dim(temp_dat[which(temp_dat$rem == 1),])[1] > 5 &
+          dim(temp_dat[which(temp_dat$rem == 0),])[1] > 5) {
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(cat_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(cat_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(cat_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[1,num] <- eq_p
+        
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[2,num] <- eq_p
+        
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[3,num] <- eq_p
+      } else {
+        AB_p[1,num] <- NA
+        AB_p[2,num] <- NA
+        AB_p[3,num] <- NA
+      }
+    }
+    
+    tAB_p <- AB_p %>%
+      kbl(caption = paste0("Age-binned Equivalence Tests for ", notest), align = rep("c", 8),
+          col.names = c("7-12","12-17","17-35")) %>%
+      kable_classic(full_width = F, html_font = "Cambria")
+    
+    templist <- c(templist,"e_test1","e_test2","e_test3","tAB_p")
+  } else if (test == "ds") {
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    
+    e_test1 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    
+    e_test2 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(macc_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(macc_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(macc_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(macc_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(macc_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(macc_res))
+    
+    e_test3 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(mspe_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(mspe_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(mspe_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(mspe_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(mspe_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(mspe_res))
+    
+    e_test4 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    AB_p <- data.frame("age_7_12" = rep(NA,4),"age_12_17" = rep(NA,4),"age_17_35" = rep(NA,4))
+    rownames(AB_p) <- c("acc","spe","macc","mspe")
+    
+    for (num in 1:3){
+      temp_dat <- test_dat %>% filter(age_bin == num)
+      if (dim(temp_dat[which(temp_dat$rem == 1),])[1] > 5 &
+          dim(temp_dat[which(temp_dat$rem == 0),])[1] > 5) {
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1107,7 +1345,91 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[2,num] <- eq_p
+        
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(macc_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(macc_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(macc_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[3,num] <- eq_p
+        
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[4,num] <- eq_p
+        
+      } else {
+        AB_p[1,num] <- NA
+        AB_p[2,num] <- NA
+        AB_p[3,num] <- NA
+        AB_p[4,num] <- NA
+      }
+    }
+    
+    tAB_p <- AB_p %>%
+      kbl(caption = paste0("Age-binned Equivalence Tests for ", notest), align = rep("c", 8),
+          col.names = c("7-12","12-17","17-35")) %>%
+      kable_classic(full_width = F, html_font = "Cambria")
+    
+    templist <- c(templist,"e_test1","e_test2","e_test3","e_test4","tAB_p")
+  } else {
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(acc_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(acc_res))
+    
+    e_test1 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    m1 <- mean(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    m2 <- mean(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    sd1 <- sd(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    sd2 <- sd(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    n1 <- length(test_dat %>% filter(rem==0) %>% pull(spe_res))
+    n2 <- length(test_dat %>% filter(rem!=0) %>% pull(spe_res))
+    
+    e_test2 <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+    
+    AB_p <- data.frame("age_7_12" = rep(NA,2),"age_12_17" = rep(NA,2),"age_17_35" = rep(NA,2))
+    rownames(AB_p) <- c("acc","spe")
+    
+    for (num in 1:3){
+      temp_dat <- test_dat %>% filter(age_bin == num)
+      if (dim(temp_dat[which(temp_dat$rem == 1),])[1] > 5 &
+          dim(temp_dat[which(temp_dat$rem == 0),])[1] > 5) {
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+        
+        AB_p[1,num] <- eq_p
+        
+        m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        sd2 <- sd(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
+        n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
+        etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
       } else {
@@ -1133,7 +1455,39 @@ for (test in test_names) {
 
 ## Data
 
-The data used for this project comes from bblrepo1 (/data/secure/bit_dwh/cnb/cnb_merged_webcnp_surveys_allbblprjcts_longform20220406.csv), keeping only the participants with BBLIDs. Many of the participants in this dataset were administered the CNB multiple times. To make things simple, we only kept their most recent data point. If a BBLID's last CNB data point was from a virtual/remote assessment, this data was kept and they were assigned as "remote". If a BBLID's last CNB data point was from an in-person assessment, this data was kept and they were assigned as "in person".
+The data used for this project comes from bblrepo1 (/data/secure/bit_dwh/cnb/cnb_merged_webcnp_surveys_allbblprjcts_longform20220406.csv), keeping only the participants with BBLIDs. Many of the participants in this dataset were administered the CNB multiple times. To make things simple, we only kept their most recent data point. If a BBLID's last CNB data point was from a virtual/remote assessment, this data was kept and they were assigned as a "Remote" participant. If a BBLID's last CNB data point was from an in-person assessment, this data was kept and they were assigned as an "In person" participant. 
+
+The analyses shown here include plots of the sex-regressed and age-matched In-person vs Remote participant accuracy and reaction time plotted against age, in addition to overall and age-binned t-tests and equivalence tests. These analyses were done for all time points as well as all timepoints from 2016 to the present.
+
+*CNB tasks examined in this document*
+* ADT36 A, ADT36 B, ADT60 A
+* AIM
+* CPF A, CPF B
+* CPW A, KCPW A
+* DIGSYM
+* EDISC
+* ER40 A, ER40 C, ER40 D
+* GNG150
+* KDDISC
+* KRDISC
+* KSPVRT A, KSPVRT B, KSPVRT D
+* MEDF36 A, MEDF36 B, MEDF60 A
+* MPRACT
+* PCET A, PCET B, SPCET A
+* PMAT24 A, PMAT24 B, PMAT18 A
+* SCTAP
+* SLNB2 90
+* SPCPTNL
+* SVOLT A
+* VSPLOT12, VSPLOT15, VSPLOT24
+
+
+
+## Age Differentiation task
+
+```{r ADT accuracy}
+Pall_rec
+```
 
 
 

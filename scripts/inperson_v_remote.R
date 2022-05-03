@@ -329,7 +329,7 @@ for(test in response_vars){
   cntr <- cntr + 1
 }
 
-pdf("plots/cross_plots_20Apr22.pdf",height = 7,width = 10)
+pdf("plots/cross_plots_3May22.pdf",height = 7,width = 10)
 for (i in 1:length(Pall_rec)){
   print(Pall_rec[[i]])
 }
@@ -879,7 +879,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
       } else {
@@ -936,7 +936,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(cat_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -947,7 +947,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -958,7 +958,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
       } else {
@@ -1025,7 +1025,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1036,7 +1036,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -1047,7 +1047,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(macc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
         
@@ -1058,7 +1058,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[4,num] <- eq_p
         
@@ -1109,10 +1109,10 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
-        
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+
         AB_p[1,num] <- eq_p
-        
+
         m1 <- mean(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         m2 <- mean(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         sd1 <- sd(temp_dat %>% filter(rem==0) %>% pull(spe_res))
@@ -1120,8 +1120,8 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
-        
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
+
         AB_p[2,num] <- eq_p
       } else {
         AB_p[1,num] <- NA
@@ -1208,7 +1208,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
       } else {
@@ -1264,7 +1264,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(cat_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(cat_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1275,7 +1275,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc2_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc2_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -1286,7 +1286,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
       } else {
@@ -1353,7 +1353,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1364,7 +1364,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
         
@@ -1375,7 +1375,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(macc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(macc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[3,num] <- eq_p
         
@@ -1386,7 +1386,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(mspe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(mspe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[4,num] <- eq_p
         
@@ -1437,7 +1437,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(acc_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(acc_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[1,num] <- eq_p
         
@@ -1448,7 +1448,7 @@ for (test in test_names) {
         n1 <- length(temp_dat %>% filter(rem==0) %>% pull(spe_res))
         n2 <- length(temp_dat %>% filter(rem!=0) %>% pull(spe_res))
         etest <- tsum_TOST(m1=m1,m2=m2,sd1=sd1,sd2=sd2,n1=n1,n2=n2,low_eqbound=-0.2,high_eqbound=0.2,alpha = 0.05,var.equal = F,eqbound_type="SMD")
-        eq_p <- round(max(true$TOST$p.value[-1]),5)
+        eq_p <- round(max(etest$TOST$p.value[-1]),5)
         
         AB_p[2,num] <- eq_p
       } else {
